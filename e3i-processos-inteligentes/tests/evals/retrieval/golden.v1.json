@@ -1,0 +1,307 @@
+{
+  "datasetId": "golden-retrieval-dataset",
+  "version": "v1.0",
+  "createdAt": "2026-08-16T00:00:00.000Z",
+  "cases": [
+    {
+      "id": "case-01",
+      "organizationId": "org-a",
+      "query": "Como controlamos os pedidos?",
+      "relevantChunkIds": ["chunk-org-a-orders-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "discovery",
+      "sourceTypes": ["DISCOVERY_ANSWER"]
+    },
+    {
+      "id": "case-02",
+      "organizationId": "org-a",
+      "query": "Os clientes fazem pedidos por onde?",
+      "relevantChunkIds": ["chunk-org-a-orders-2"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "paraphrase",
+      "sourceTypes": ["DISCOVERY_ANSWER"]
+    },
+    {
+      "id": "case-03",
+      "organizationId": "org-a",
+      "query": "Qual é o faturamento mensal?",
+      "relevantChunkIds": ["chunk-org-a-finance-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "business_context",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-04",
+      "organizationId": "org-a",
+      "query": "Qual o processo de produção da fábrica?",
+      "relevantChunkIds": ["chunk-org-a-prod-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "process",
+      "sourceTypes": ["PROCESS"]
+    },
+    {
+      "id": "case-05",
+      "organizationId": "org-a",
+      "query": "Qual é a política de férias dos funcionários?",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": [],
+      "noAnswer": true,
+      "category": "no_answer",
+      "sourceTypes": []
+    },
+    {
+      "id": "case-06",
+      "organizationId": "org-a",
+      "query": "Quais são os dados super confidenciais internos?",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": ["chunk-org-a-restricted-1"],
+      "noAnswer": true,
+      "category": "security_restricted",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-07",
+      "organizationId": "org-a",
+      "query": "Qual sistema usamos para pedidos?",
+      "relevantChunkIds": ["chunk-org-a-system-new"],
+      "forbiddenChunkIds": ["chunk-org-a-system-old"],
+      "noAnswer": false,
+      "category": "superseded",
+      "sourceTypes": ["SYSTEM"]
+    },
+    {
+      "id": "case-08",
+      "organizationId": "org-a",
+      "query": "Usamos SAP para controle de pedidos.",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": ["chunk-org-b-sap"],
+      "noAnswer": true,
+      "category": "cross_tenant",
+      "sourceTypes": ["SYSTEM"]
+    },
+    {
+      "id": "case-09",
+      "organizationId": "org-a",
+      "query": "planilha",
+      "relevantChunkIds": ["chunk-org-a-orders-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "exact_term",
+      "sourceTypes": ["DISCOVERY_ANSWER"]
+    },
+    {
+      "id": "case-10",
+      "organizationId": "org-a",
+      "query": "diretoria",
+      "relevantChunkIds": ["chunk-org-a-finance-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "exact_term",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-11",
+      "organizationId": "org-a",
+      "query": "Como é o atendimento ao cliente?",
+      "relevantChunkIds": ["chunk-org-a-support-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "discovery",
+      "sourceTypes": ["DISCOVERY_ANSWER"]
+    },
+    {
+      "id": "case-12",
+      "organizationId": "org-a",
+      "query": "Quais os canais de suporte?",
+      "relevantChunkIds": ["chunk-org-a-support-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "paraphrase",
+      "sourceTypes": ["DISCOVERY_ANSWER"]
+    },
+    {
+      "id": "case-13",
+      "organizationId": "org-a",
+      "query": "Qual a margem de lucro?",
+      "relevantChunkIds": ["chunk-org-a-finance-2"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "business_context",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-14",
+      "organizationId": "org-a",
+      "query": "margem lucro",
+      "relevantChunkIds": ["chunk-org-a-finance-2"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "exact_term",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-15",
+      "organizationId": "org-a",
+      "query": "Qual a meta de vendas para o trimestre?",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": [],
+      "noAnswer": true,
+      "category": "no_answer",
+      "sourceTypes": []
+    },
+    {
+      "id": "case-16",
+      "organizationId": "org-a",
+      "query": "Como é feito o controle de estoque?",
+      "relevantChunkIds": ["chunk-org-a-stock-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "process",
+      "sourceTypes": ["PROCESS"]
+    },
+    {
+      "id": "case-17",
+      "organizationId": "org-a",
+      "query": "estoque",
+      "relevantChunkIds": ["chunk-org-a-stock-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "exact_term",
+      "sourceTypes": ["PROCESS"]
+    },
+    {
+      "id": "case-18",
+      "organizationId": "org-a",
+      "query": "Qual o organograma da empresa?",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": [],
+      "noAnswer": true,
+      "category": "no_answer",
+      "sourceTypes": []
+    },
+    {
+      "id": "case-19",
+      "organizationId": "org-a",
+      "query": "Como são emitidas as notas fiscais?",
+      "relevantChunkIds": ["chunk-org-a-fiscal-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "process",
+      "sourceTypes": ["PROCESS"]
+    },
+    {
+      "id": "case-20",
+      "organizationId": "org-a",
+      "query": "nota fiscal",
+      "relevantChunkIds": ["chunk-org-a-fiscal-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "exact_term",
+      "sourceTypes": ["PROCESS"]
+    },
+    {
+      "id": "case-21",
+      "organizationId": "org-a",
+      "query": "Qual a política de reembolso de despesas?",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": [],
+      "noAnswer": true,
+      "category": "no_answer",
+      "sourceTypes": []
+    },
+    {
+      "id": "case-22",
+      "organizationId": "org-a",
+      "query": "Quais fornecedores principais utilizamos?",
+      "relevantChunkIds": ["chunk-org-a-supply-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "business_context",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-23",
+      "organizationId": "org-a",
+      "query": "fornecedores",
+      "relevantChunkIds": ["chunk-org-a-supply-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "exact_term",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-24",
+      "organizationId": "org-a",
+      "query": "Qual a taxa de rotatividade de funcionários?",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": [],
+      "noAnswer": true,
+      "category": "no_answer",
+      "sourceTypes": []
+    },
+    {
+      "id": "case-25",
+      "organizationId": "org-a",
+      "query": "Como funciona o fechamento contábil?",
+      "relevantChunkIds": ["chunk-org-a-accounting-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "process",
+      "sourceTypes": ["PROCESS"]
+    },
+    {
+      "id": "case-26",
+      "organizationId": "org-b",
+      "query": "Como controlamos a produção em org-b?",
+      "relevantChunkIds": ["chunk-org-b-prod-1"],
+      "forbiddenChunkIds": ["chunk-org-a-prod-1"],
+      "noAnswer": false,
+      "category": "validation_tenant",
+      "sourceTypes": ["PROCESS"]
+    },
+    {
+      "id": "case-27",
+      "organizationId": "org-b",
+      "query": "Qual o faturamento de org-b?",
+      "relevantChunkIds": ["chunk-org-b-fin-1"],
+      "forbiddenChunkIds": ["chunk-org-a-finance-1"],
+      "noAnswer": false,
+      "category": "validation_tenant",
+      "sourceTypes": ["BUSINESS_CONTEXT"]
+    },
+    {
+      "id": "case-28",
+      "organizationId": "org-b",
+      "query": "Qual a ferramenta de projetos?",
+      "relevantChunkIds": ["chunk-org-b-proj-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "validation",
+      "sourceTypes": ["SYSTEM"]
+    },
+    {
+      "id": "case-29",
+      "organizationId": "org-b",
+      "query": "Qual a política de segurança da informação?",
+      "relevantChunkIds": [],
+      "forbiddenChunkIds": [],
+      "noAnswer": true,
+      "category": "validation_no_answer",
+      "sourceTypes": []
+    },
+    {
+      "id": "case-30",
+      "organizationId": "org-b",
+      "query": "Como os clientes fazem contato?",
+      "relevantChunkIds": ["chunk-org-b-contact-1"],
+      "forbiddenChunkIds": [],
+      "noAnswer": false,
+      "category": "validation",
+      "sourceTypes": ["DISCOVERY_ANSWER"]
+    }
+  ]
+}

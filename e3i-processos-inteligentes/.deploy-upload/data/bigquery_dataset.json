@@ -1,0 +1,662 @@
+{
+  "projectId": "e3i-solucoes-prod",
+  "datasetId": "e3i_analytics_ds",
+  "region": "us-east1",
+  "lastSyncAt": "2026-08-17T23:17:27.088Z",
+  "tables": {
+    "tenants": {
+      "rowsCount": 4,
+      "schema": [
+        "id",
+        "name",
+        "document",
+        "status",
+        "customLogoUrl",
+        "createdAt"
+      ],
+      "data": [
+        {
+          "id": "tenant-1",
+          "name": "E3I Holding Global S.A.",
+          "tradeName": "E3I Soluções Matriz",
+          "document": "45.892.104/0001-99",
+          "plan": "Enterprise",
+          "status": "ACTIVE",
+          "usersCount": 142,
+          "createdAt": "2024-01-15",
+          "customLogoUrl": "",
+          "legalName": "E3I Holding Global S.A."
+        },
+        {
+          "id": "tenant-2",
+          "name": "Logística Inteligente Alfa Ltda",
+          "tradeName": "Alfa Log",
+          "document": "12.345.678/0001-10",
+          "plan": "Professional",
+          "status": "ACTIVE",
+          "usersCount": 38,
+          "createdAt": "2024-03-10",
+          "customLogoUrl": "",
+          "legalName": "Logística Inteligente Alfa Ltda"
+        },
+        {
+          "id": "tenant-3",
+          "name": "Fintech Beta Processos S.A.",
+          "tradeName": "Beta Pay",
+          "document": "98.765.432/0001-55",
+          "plan": "Enterprise",
+          "status": "ACTIVE",
+          "usersCount": 64,
+          "createdAt": "2024-05-22",
+          "customLogoUrl": "",
+          "legalName": "Fintech Beta Processos S.A."
+        },
+        {
+          "id": "tenant-1787008040315",
+          "name": "MARANTMIR",
+          "tradeName": "MARANTMIR",
+          "document": "0000000000100",
+          "plan": "Professional",
+          "status": "ACTIVE",
+          "usersCount": 1,
+          "createdAt": "2026-08-17"
+        }
+      ]
+    },
+    "users": {
+      "rowsCount": 4,
+      "schema": [
+        "id",
+        "name",
+        "email",
+        "role",
+        "tenantId",
+        "status"
+      ],
+      "data": [
+        {
+          "id": "usr-1",
+          "name": "Dr. Carlos Eduardo E3I",
+          "email": "carlos.eduardo@e3i.com.br",
+          "role": "ADMIN",
+          "tenantId": "tenant-1",
+          "status": "ACTIVE",
+          "lastLogin": "Há 5 minutos",
+          "passwordHash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+          "password": "[REDACTED]",
+          "systemRole": "E3I_ADMIN",
+          "createdAt": "2026-08-09"
+        },
+        {
+          "id": "usr-2",
+          "name": "Ana Beatriz Souza",
+          "email": "ana.souza@e3i.com.br",
+          "role": "MANAGER",
+          "tenantId": "tenant-1",
+          "status": "ACTIVE",
+          "lastLogin": "Há 1 hora",
+          "passwordHash": "e82827b00b2ca8620beb37f879778c082b292a52270390cff35b6fe3157f4e8b",
+          "password": "[REDACTED]",
+          "createdAt": "2026-08-09"
+        },
+        {
+          "id": "usr-3",
+          "name": "Marcos Vinicius Alfa",
+          "email": "marcos@alfalog.com.br",
+          "role": "OPERATOR",
+          "tenantId": "tenant-2",
+          "status": "ACTIVE",
+          "lastLogin": "Há 2 dias",
+          "passwordHash": "d52d73c7f98eaf8689eb9203765ff63c991ae2948d84ca348ab5d986ebeb6ff6",
+          "password": "[REDACTED]",
+          "createdAt": "2026-08-09"
+        },
+        {
+          "id": "usr-1787008040315",
+          "name": "Marco Antonio Miranda",
+          "email": "marcoantoniomiranda713@gmail.com",
+          "role": "ADMIN",
+          "tenantId": "tenant-1787008040315",
+          "status": "ACTIVE",
+          "lastLogin": "Agora mesmo",
+          "passwordHash": "$argon2id$v=19$m=65536,p=4,t=3$Np3x9XGYqgtkZm7A1CkXpw$GD19VYbSX77kJ9TuD9boMGlvGdTblWBuNzs3u8fkx9w"
+        }
+      ]
+    },
+    "discovery_sessions": {
+      "rowsCount": 1,
+      "schema": [
+        "id",
+        "tenantId",
+        "userId",
+        "currentDimension",
+        "status",
+        "answersCount"
+      ],
+      "data": [
+        {
+          "id": "dsc-1786289450853",
+          "tenantId": "tenant-1",
+          "userId": "usr-1",
+          "status": "IN_PROGRESS",
+          "currentDimension": "company",
+          "currentQuestionIndex": 1,
+          "answers": [
+            {
+              "dimension": "company",
+              "questionId": "comp-1",
+              "questionText": "Qual é o principal produto ou serviço da empresa?",
+              "answer": "Soluções em automação de processos inteligentes",
+              "isDontKnow": false,
+              "confidence": 65,
+              "timestamp": "2026-08-17T23:17:27.087Z"
+            }
+          ],
+          "confidenceScores": {
+            "company": 65,
+            "strategy": 50,
+            "organization": 50,
+            "operations": 50,
+            "systems": 50,
+            "indicators": 50,
+            "knowledge": 50,
+            "findings": 50
+          },
+          "inconsistencies": [],
+          "startedAt": "2026-08-09T15:30:50.853Z",
+          "updatedAt": "2026-08-17T23:17:27.087Z"
+        }
+      ]
+    },
+    "strategy_canvases": {
+      "rowsCount": 0,
+      "schema": [
+        "id",
+        "tenantId",
+        "mission",
+        "vision",
+        "values",
+        "pillars"
+      ],
+      "data": []
+    },
+    "organization_maps": {
+      "rowsCount": 0,
+      "schema": [
+        "id",
+        "tenantId",
+        "version",
+        "areasCount",
+        "rolesCount"
+      ],
+      "data": []
+    },
+    "business_systems": {
+      "rowsCount": 5,
+      "schema": [
+        "id",
+        "name",
+        "category",
+        "criticality",
+        "validationStatus"
+      ],
+      "data": [
+        {
+          "id": "sys-1",
+          "tenantId": "tenant-1",
+          "name": "Omie ERP",
+          "category": "ERP",
+          "vendor": "Omie",
+          "purpose": "Gestão financeira, faturamento e emissão de notas fiscais",
+          "areasUsing": [
+            "Financeiro",
+            "Comercial",
+            "Diretoria"
+          ],
+          "owner": "Carlos Eduardo",
+          "criticality": "CRITICAL",
+          "dataHandled": "Dados de clientes, faturamento, notas fiscais, plano de contas",
+          "authenticationType": "API Token / OAuth2",
+          "integrationCapability": "API_AVAILABLE",
+          "source": "Discovery / Contexto",
+          "confidence": 95,
+          "validationStatus": "CONFIRMED"
+        },
+        {
+          "id": "sys-2",
+          "tenantId": "tenant-1",
+          "name": "HubSpot CRM",
+          "category": "CRM",
+          "vendor": "HubSpot",
+          "purpose": "Gestão de leads, pipeline de vendas e relacionamento com clientes",
+          "areasUsing": [
+            "Comercial",
+            "Marketing"
+          ],
+          "owner": "Ana Souza",
+          "criticality": "HIGH",
+          "dataHandled": "Contatos, leads, oportunidades e propostas comerciais",
+          "authenticationType": "OAuth2 / API Key",
+          "integrationCapability": "API_AVAILABLE",
+          "source": "Discovery / Contexto",
+          "confidence": 90,
+          "validationStatus": "CONFIRMED"
+        },
+        {
+          "id": "sys-3",
+          "tenantId": "tenant-1",
+          "name": "Google Workspace",
+          "category": "Documentos",
+          "vendor": "Google",
+          "purpose": "E-mail corporativo, documentos, planilhas e colaboração",
+          "areasUsing": [
+            "Todas as Áreas"
+          ],
+          "owner": "TI Corporativa",
+          "criticality": "CRITICAL",
+          "dataHandled": "E-mails, planilhas contratuais e relatórios gerenciais",
+          "authenticationType": "SAML / Google SSO",
+          "integrationCapability": "NATIVE_CONNECTOR",
+          "source": "Contexto de Negócio",
+          "confidence": 98,
+          "validationStatus": "CONFIRMED"
+        },
+        {
+          "id": "sys-4",
+          "tenantId": "tenant-1",
+          "name": "WhatsApp Business",
+          "category": "WhatsApp",
+          "vendor": "Meta",
+          "purpose": "Atendimento ao cliente e suporte operacional",
+          "areasUsing": [
+            "Suporte",
+            "Comercial"
+          ],
+          "owner": "Equipe de Atendimento",
+          "criticality": "MEDIUM",
+          "dataHandled": "Mensagens, histórico de atendimento e solicitações",
+          "authenticationType": "API Webhook",
+          "integrationCapability": "WEBHOOK_AVAILABLE",
+          "source": "Descoberta Operacional",
+          "confidence": 85,
+          "validationStatus": "NEEDS_REVIEW"
+        },
+        {
+          "id": "sys-5",
+          "tenantId": "tenant-1",
+          "name": "Planilhas Excel de Comissões",
+          "category": "Planilhas",
+          "vendor": "Microsoft",
+          "purpose": "Cálculo manual de comissões de vendas por colaborador",
+          "areasUsing": [
+            "Financeiro",
+            "Comercial"
+          ],
+          "owner": "Maria Financeiro",
+          "criticality": "HIGH",
+          "dataHandled": "Valores de comissões e metas calculadas",
+          "authenticationType": "Nenhum (Local/Drive)",
+          "integrationCapability": "FILE_IMPORT_EXPORT",
+          "source": "Controle Manual Identificado",
+          "confidence": 92,
+          "validationStatus": "NEEDS_REVIEW"
+        }
+      ]
+    },
+    "manual_controls": {
+      "rowsCount": 2,
+      "schema": [
+        "id",
+        "responsible",
+        "purpose",
+        "frequency"
+      ],
+      "data": [
+        {
+          "id": "mc-1",
+          "tenantId": "tenant-1",
+          "responsible": "Maria Financeiro",
+          "purpose": "Consolidar planilhas de vendas e calcular comissões manualmente",
+          "frequency": "Mensal",
+          "origin": "HubSpot CRM",
+          "target": "Omie ERP",
+          "risk": "Alto risco de erro de digitação e divergência de valores",
+          "estimatedRework": "12h / mês"
+        },
+        {
+          "id": "mc-2",
+          "tenantId": "tenant-1",
+          "responsible": "Carlos Eduardo",
+          "purpose": "Digitar dados de clientes fechados no CRM novamente no faturamento",
+          "frequency": "Diária",
+          "origin": "HubSpot CRM",
+          "target": "Omie ERP",
+          "risk": "Dupla digitação e atraso na emissão de faturas",
+          "estimatedRework": "8h / semana"
+        }
+      ]
+    },
+    "information_flows": {
+      "rowsCount": 3,
+      "schema": [
+        "id",
+        "source",
+        "target",
+        "mechanism"
+      ],
+      "data": [
+        {
+          "id": "flow-1",
+          "tenantId": "tenant-1",
+          "source": "HubSpot CRM",
+          "target": "Omie ERP",
+          "dataType": "Dados de Contratos e Clientes",
+          "direction": "Unidirecional",
+          "frequency": "Diária",
+          "mechanism": "MANUAL",
+          "manual": true,
+          "criticality": "Alta",
+          "confidence": 90,
+          "validationStatus": "CONFIRMED"
+        },
+        {
+          "id": "flow-2",
+          "tenantId": "tenant-1",
+          "source": "WhatsApp Business",
+          "target": "Planilhas Excel",
+          "dataType": "Solicitações de Suporte",
+          "direction": "Unidirecional",
+          "frequency": "Contínua",
+          "mechanism": "MANUAL",
+          "manual": true,
+          "criticality": "Média",
+          "confidence": 85,
+          "validationStatus": "NEEDS_REVIEW"
+        },
+        {
+          "id": "flow-3",
+          "tenantId": "tenant-1",
+          "source": "Omie ERP",
+          "target": "Google Workspace",
+          "dataType": "Relatórios Financeiros",
+          "direction": "Unidirecional",
+          "frequency": "Semanal",
+          "mechanism": "FILE",
+          "manual": false,
+          "criticality": "Alta",
+          "confidence": 95,
+          "validationStatus": "CONFIRMED"
+        }
+      ]
+    },
+    "system_integrations": {
+      "rowsCount": 2,
+      "schema": [
+        "id",
+        "integrationType",
+        "validationStatus"
+      ],
+      "data": [
+        {
+          "id": "int-1",
+          "tenantId": "tenant-1",
+          "sourceSystemId": "sys-3",
+          "targetSystemId": "sys-1",
+          "integrationType": "EXISTING",
+          "description": "Exportação de relatórios via CSV/Planilhas para o Google Workspace.",
+          "confidence": 95,
+          "validationStatus": "CONFIRMED"
+        },
+        {
+          "id": "int-2",
+          "tenantId": "tenant-1",
+          "sourceSystemId": "sys-2",
+          "targetSystemId": "sys-1",
+          "integrationType": "NECESSARY",
+          "description": "Integração direta via API entre HubSpot CRM e Omie ERP para eliminar dupla digitação de clientes.",
+          "confidence": 92,
+          "validationStatus": "CONFIRMED"
+        }
+      ]
+    },
+    "audit_logs": {
+      "rowsCount": 13,
+      "schema": [
+        "id",
+        "timestamp",
+        "organizationId",
+        "actorUserId",
+        "targetType",
+        "action",
+        "result"
+      ],
+      "data": [
+        {
+          "id": "log-1787008647087",
+          "timestamp": "2026-08-17 23:17:27",
+          "organizationId": "tenant-1",
+          "actorUserId": "usr-1",
+          "targetType": "DISCOVERY",
+          "targetId": "dsc-1786289450853",
+          "action": "DISCOVERY_ANSWER_SAVED",
+          "result": "SUCCESS",
+          "metadata": {
+            "dimension": "company",
+            "questionId": "comp-1"
+          }
+        },
+        {
+          "id": "log-1787008641562",
+          "timestamp": "2026-08-17 23:17:21",
+          "organizationId": "tenant-1",
+          "actorUserId": "usr-1",
+          "targetType": "DISCOVERY",
+          "targetId": "dsc-1786289450853",
+          "action": "DISCOVERY_RESUMED",
+          "result": "SUCCESS",
+          "metadata": {
+            "dimension": "company"
+          }
+        },
+        {
+          "id": "log-1787008639613",
+          "timestamp": "2026-08-17 23:17:19",
+          "userId": "usr-1",
+          "userName": "Dr. Carlos Eduardo E3I",
+          "action": "LOGIN_SUCCESS",
+          "module": "Autenticação",
+          "ipAddress": "127.0.0.1",
+          "status": "SUCCESS",
+          "details": "Login efetuado com sucesso para a empresa E3I Holding Global S.A."
+        },
+        {
+          "id": "log-1787008635644",
+          "timestamp": "2026-08-17 23:17:15",
+          "userId": "anonymous",
+          "userName": "Anônimo",
+          "action": "LOGIN_FAILED",
+          "module": "Autenticação",
+          "ipAddress": "127.0.0.1",
+          "status": "WARNING",
+          "details": "Tentativa de login falhou: usuário carlos.eduardo@novafarma.com.br não encontrado."
+        },
+        {
+          "id": "log-1787007992354",
+          "timestamp": "2026-08-17 23:06:32",
+          "userId": "anonymous",
+          "userName": "Anônimo",
+          "action": "LOGIN_FAILED",
+          "module": "Autenticação",
+          "ipAddress": "127.0.0.1",
+          "status": "WARNING",
+          "details": "Tentativa de login falhou: usuário marcoantoniomiranda713@gmail.com não encontrado."
+        },
+        {
+          "id": "log-1787007982018",
+          "timestamp": "2026-08-17 23:06:22",
+          "userId": "anonymous",
+          "userName": "Anônimo",
+          "action": "LOGIN_FAILED",
+          "module": "Autenticação",
+          "ipAddress": "127.0.0.1",
+          "status": "WARNING",
+          "details": "Tentativa de login falhou: usuário marcoantoniomiranda713@gmail.com não encontrado."
+        },
+        {
+          "id": "log-1786289459231-2",
+          "timestamp": "2026-08-09 15:30:59",
+          "organizationId": "tenant-1",
+          "actorUserId": "usr-1",
+          "targetType": "BUSINESS_CONTEXT",
+          "targetId": "cp-1786289459230",
+          "action": "BUSINESS_CONTEXT_VERSION_CREATED",
+          "result": "SUCCESS",
+          "metadata": {
+            "version": "v2.2"
+          }
+        },
+        {
+          "id": "log-1786289459231-1",
+          "timestamp": "2026-08-09 15:30:59",
+          "organizationId": "tenant-1",
+          "actorUserId": "usr-1",
+          "targetType": "BUSINESS_CONTEXT",
+          "targetId": "cp-1786289459230",
+          "action": "BUSINESS_CONTEXT_REBUILT",
+          "result": "SUCCESS",
+          "metadata": {
+            "version": "v2.2",
+            "overallConfidence": 87
+          }
+        },
+        {
+          "id": "log-1786289451095",
+          "timestamp": "2026-08-09 15:30:51",
+          "organizationId": "tenant-1",
+          "actorUserId": "usr-1",
+          "targetType": "DISCOVERY",
+          "targetId": "dsc-1786289450853",
+          "action": "DISCOVERY_RESUMED",
+          "result": "SUCCESS",
+          "metadata": {
+            "dimension": "company"
+          }
+        },
+        {
+          "id": "log-1786289450853",
+          "timestamp": "2026-08-09 15:30:50",
+          "organizationId": "tenant-1",
+          "actorUserId": "usr-1",
+          "targetType": "DISCOVERY",
+          "targetId": "dsc-1786289450853",
+          "action": "DISCOVERY_STARTED",
+          "result": "SUCCESS",
+          "metadata": {
+            "dimension": "company"
+          }
+        },
+        {
+          "id": "log-101",
+          "timestamp": "2026-08-02 17:02:15",
+          "userId": "usr-1",
+          "userName": "Dr. Carlos Eduardo E3I",
+          "action": "LOGIN_SUCCESS",
+          "module": "Autenticação",
+          "ipAddress": "192.168.1.45",
+          "status": "SUCCESS",
+          "details": "Sessão iniciada com segurança via token JWT."
+        },
+        {
+          "id": "log-102",
+          "timestamp": "2026-08-02 16:45:10",
+          "userId": "usr-2",
+          "userName": "Ana Beatriz Souza",
+          "action": "TENANT_SWITCH",
+          "module": "Multi-Tenant",
+          "ipAddress": "192.168.1.88",
+          "status": "SUCCESS",
+          "details": "Alternado contexto para filial Logística Alfa Ltda."
+        },
+        {
+          "id": "log-103",
+          "timestamp": "2026-08-02 15:30:00",
+          "userId": "usr-1",
+          "userName": "Dr. Carlos Eduardo E3I",
+          "action": "PERMISSION_UPDATE",
+          "module": "RBAC",
+          "ipAddress": "192.168.1.45",
+          "status": "SUCCESS",
+          "details": "Atualizadas permissões do grupo Operacional."
+        }
+      ]
+    },
+    "organization_memberships": {
+      "rowsCount": 3,
+      "schema": [
+        "id",
+        "userId",
+        "organizationId",
+        "role",
+        "status",
+        "joinedAt"
+      ],
+      "data": [
+        {
+          "id": "mem-usr-1-tenant-1",
+          "userId": "usr-1",
+          "organizationId": "tenant-1",
+          "role": "ORGANIZATION_ADMIN",
+          "status": "ACTIVE",
+          "joinedAt": "2026-08-09T16:14:06.946Z"
+        },
+        {
+          "id": "mem-usr-2-tenant-1",
+          "userId": "usr-2",
+          "organizationId": "tenant-1",
+          "role": "PROCESS_MANAGER",
+          "status": "ACTIVE",
+          "joinedAt": "2026-08-09T16:14:06.948Z"
+        },
+        {
+          "id": "mem-usr-3-tenant-2",
+          "userId": "usr-3",
+          "organizationId": "tenant-2",
+          "role": "VIEWER",
+          "status": "ACTIVE",
+          "joinedAt": "2026-08-09T16:14:06.950Z"
+        }
+      ]
+    },
+    "sessions": {
+      "rowsCount": 2,
+      "schema": [
+        "id",
+        "userId",
+        "currentOrganizationId",
+        "currentMembershipId",
+        "tokenHash",
+        "expiresAt",
+        "revokedAt",
+        "createdAt"
+      ],
+      "data": [
+        {
+          "id": "sess-seed-admin",
+          "userId": "usr-1",
+          "token": "e3i_jwt_token_seed_admin",
+          "revokedAt": null,
+          "expiresAt": "2027-08-17T23:17:14.543Z",
+          "createdAt": "2026-08-17T23:17:14.543Z"
+        },
+        {
+          "id": "sess-1787008639613-709ct",
+          "userId": "usr-1",
+          "token": "e3i_jwt_token_6c13f40i012_1787008639613",
+          "revokedAt": null,
+          "expiresAt": "2026-08-18T23:17:19.613Z",
+          "createdAt": "2026-08-17T23:17:19.613Z"
+        }
+      ]
+    }
+  }
+}

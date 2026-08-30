@@ -1,0 +1,22 @@
+name: Deploy Production
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install & Build
+        run: |
+          npm ci
+          npm run build
+      - name: Deploy to Production Environment (Requires Manual Approval)
+        run: echo "Deploying immutable artifact to Production Cloud Run..."

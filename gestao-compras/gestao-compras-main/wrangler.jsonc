@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gestao-compras",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-16",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "orcafacil-db",
+      "database_id": "f43b0760-4b01-4bca-af95-9df315ca2f25",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true },
+  "routes": [
+    {
+      "pattern": "compras.e3isolucoes.com.br",
+      "custom_domain": true
+    }
+  ]
+}

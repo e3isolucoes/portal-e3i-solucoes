@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: var(--e3i-canvas);
+  --color-surface: var(--e3i-surface);
+  --color-surface-raised: var(--e3i-surface-raised);
+  --color-border-subtle: var(--e3i-border-subtle);
+  --color-border-strong: var(--e3i-border-strong);
+  --color-accent: var(--e3i-accent);
+  --color-accent-hover: var(--e3i-accent-hover);
+  --color-gold: var(--e3i-gold);
+  --color-text-primary: var(--e3i-text-primary);
+  --color-text-secondary: var(--e3i-text-secondary);
+  --color-text-muted: var(--e3i-text-muted);
+  --color-success: var(--e3i-success);
+  --color-warning: var(--e3i-warning);
+  --color-danger: var(--e3i-danger);
+
+  --font-display: 'Zilla Slab', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+:root, [data-theme="dark"] {
+  --e3i-canvas: #060B14;
+  --e3i-surface: #0B132B;
+  --e3i-surface-raised: #121E3D;
+  --e3i-border-subtle: #1E293B;
+  --e3i-border-strong: #334155;
+  --e3i-accent: #2563EB;
+  --e3i-accent-hover: #1D4ED8;
+  --e3i-gold: #C5A028;
+  --e3i-text-primary: #F1F5F9;
+  --e3i-text-secondary: #94A3B8;
+  --e3i-text-muted: #64748B;
+  --e3i-success: #059669;
+  --e3i-warning: #D97706;
+  --e3i-danger: #DC2626;
+}
+
+[data-theme="light"] {
+  --e3i-canvas: #F8FAFC;
+  --e3i-surface: #FFFFFF;
+  --e3i-surface-raised: #F1F5F9;
+  --e3i-border-subtle: #E2E8F0;
+  --e3i-border-strong: #CBD5E1;
+  --e3i-accent: #1D4ED8;
+  --e3i-accent-hover: #1E40AF;
+  --e3i-gold: #9A7B1C;
+  --e3i-text-primary: #0F172A;
+  --e3i-text-secondary: #475569;
+  --e3i-text-muted: #64748B;
+  --e3i-success: #047857;
+  --e3i-warning: #B45309;
+  --e3i-danger: #B91C1C;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.tabular-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.e3i-grid-bg {
+  background-image: linear-gradient(to right, rgba(30, 41, 59, 0.15) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(30, 41, 59, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+

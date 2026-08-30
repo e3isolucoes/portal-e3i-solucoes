@@ -1,0 +1,35 @@
+[build]
+  publish = "."
+
+# Segurança — cabeçalhos aplicados a todo o site
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+# Cache longo para imagens (nomes versionados por tamanho)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# HTML sempre revalidado
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[redirects]]
+  from = "/apresentacao"
+  to = "/apresentacao_e_3_i.html"
+  status = 301
+
+[[redirects]]
+  from = "/whatsapp"
+  to = "https://wa.me/5516992292468"
+  status = 302
+  force = true

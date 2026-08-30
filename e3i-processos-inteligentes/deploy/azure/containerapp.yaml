@@ -1,0 +1,40 @@
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 3000
+      transport: auto
+  template:
+    containers:
+      - name: e3i-portal
+        image: IMAGE_PLACEHOLDER
+        env:
+          - name: NODE_ENV
+            value: production
+          - name: PORT
+            value: "3000"
+          - name: ALLOW_PUBLIC_REGISTRATION
+            value: "false"
+          - name: AI_FEATURES_ENABLED
+            value: "false"
+          - name: DATABASE_URL
+            value: file:./data/portal.db
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        volumeMounts:
+          - volumeName: e3i-data-volume
+            mountPath: /app/data
+    scale:
+      minReplicas: 0
+      maxReplicas: 1
+      rules:
+        - name: http-rule
+          http:
+            metadata:
+              concurrentRequests: "20"
+    volumes:
+      - name: e3i-data-volume
+        storageType: AzureFile
+        storageName: e3idatamount

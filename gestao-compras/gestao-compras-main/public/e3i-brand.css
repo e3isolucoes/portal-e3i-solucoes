@@ -1,0 +1,51 @@
+:root {
+  --ink: #0E1A29;
+  --green: #8F6A11;
+  --green-dark: #6F5009;
+  --mint: #F7EFCF;
+  --cream: #F0F2EC;
+  --muted: #5C6672;
+  --line: #CFD6C6;
+  --white: #FBFBF8;
+  --navy: #17395C;
+  --gold: #D9A925;
+}
+
+body, button, input, textarea {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+h1, h2, h3, .brand {
+  font-family: 'Zilla Slab', Georgia, serif;
+}
+
+.eyebrow, .status, table {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.topbar {
+  background: rgba(240, 242, 236, .94);
+  border-bottom-color: var(--line);
+}
+
+.request-card, .output-card, .steps article {
+  background: var(--white);
+  border-radius: 4px;
+}
+
+.primary, .secondary, .field input, .field textarea {
+  border-radius: 3px;
+}
+
+:focus-visible {
+  outline: 3px solid #D9A925;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}

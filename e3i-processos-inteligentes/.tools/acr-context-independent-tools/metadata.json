@@ -1,0 +1,6 @@
+{
+  "name": "E3I Processos Inteligentes",
+  "description": "Plataforma Enterprise SaaS - Sprint 2.2: Strategy Canvas Adaptativo, Discovery Engine e Context Package v2",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

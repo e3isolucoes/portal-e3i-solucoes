@@ -1,0 +1,63 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id           String                   @id @default(uuid())
+  legalName    String
+  tradeName    String
+  document     String
+  status       String                   @default("ACTIVE")
+  plan         String                   @default("Enterprise")
+  usersCount   Int                      @default(0)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  memberships  OrganizationMembership[]
+  sessions     Session[]
+}
+
+model User {
+  id           String                   @id
+  name         String
+  email        String                   @unique
+  passwordHash String
+  status       String                   @default("ACTIVE")
+  systemRole   String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  memberships  OrganizationMembership[]
+  sessions     Session[]
+}
+
+model OrganizationMembership {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  role           String       @default("VIEWER")
+  status         String       @default("ACTIVE")
+  joinedAt       DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+model Session {
+  id                    String        @id
+  userId                String
+  currentOrganizationId String?
+  currentMembershipId   String?
+  tokenHash             String        @unique
+  expiresAt             DateTime
+  revokedAt             DateTime?
+  createdAt             DateTime      @default(now())
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization          Organization? @relation(fields: [currentOrganizationId], references: [id], onDelete: SetNull)
+}

@@ -1,0 +1,6 @@
+node_modules/
+.secrets/
+.migration/
+.tools/
+.DS_Store
+js/config.js

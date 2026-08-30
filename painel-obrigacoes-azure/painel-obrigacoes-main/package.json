@@ -1,0 +1,18 @@
+{
+  "name": "painel-obrigacoes-alertas",
+  "private": true,
+  "type": "module",
+  "description": "Dependências usadas apenas pelo script scripts/enviar-alertas.mjs (alertas diários por e-mail, rodado via GitHub Actions). O painel em si não tem build nem dependências — é HTML/CSS/JS puro servido estaticamente.",
+  "scripts": {
+    "build": "echo 'Nenhum build necessário para site estático'",
+    "test": "node --test",
+    "typecheck": "node --check src/ai/index.js && node --check api/checklist-suggestions.js",
+    "test:unit": "node --test test/ai-foundation.test.js",
+    "test:integration": "node --test test/ai-foundation.integration.test.js",
+    "test:frontend": "node --test test/*.test.js",
+    "alertas": "node scripts/enviar-alertas.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

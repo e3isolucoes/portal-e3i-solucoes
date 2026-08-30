@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: var(--e3i-canvas);
+  --color-surface: var(--e3i-surface);
+  --color-surface-raised: var(--e3i-surface-raised);
+  --color-border-subtle: var(--e3i-border-subtle);
+  --color-border-strong: var(--e3i-border-strong);
+  --color-accent: var(--e3i-accent);
+  --color-accent-hover: var(--e3i-accent-hover);
+  --color-gold: var(--e3i-gold);
+  --color-text-primary: var(--e3i-text-primary);
+  --color-text-secondary: var(--e3i-text-secondary);
+  --color-text-muted: var(--e3i-text-muted);
+  --color-success: var(--e3i-success);
+  --color-warning: var(--e3i-warning);
+  --color-danger: var(--e3i-danger);
+
+  --font-display: 'Zilla Slab', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+:root, [data-theme="light"] {
+  --e3i-canvas: #F0F2EC;
+  --e3i-surface: #FBFBF8;
+  --e3i-surface-raised: #E6EAE0;
+  --e3i-border-subtle: #CFD6C6;
+  --e3i-border-strong: #B9C1B3;
+  --e3i-accent: #17395C;
+  --e3i-accent-hover: #0E1A29;
+  --e3i-gold: #8F6A11;
+  --e3i-text-primary: #0E1A29;
+  --e3i-text-secondary: #33404F;
+  --e3i-text-muted: #5C6672;
+  --e3i-success: #2C5A3C;
+  --e3i-warning: #8F6A11;
+  --e3i-danger: #93261F;
+}
+
+[data-theme="dark"] {
+  --e3i-canvas: #0E1A29;
+  --e3i-surface: #132438;
+  --e3i-surface-raised: #1A3049;
+  --e3i-border-subtle: #2C3B4D;
+  --e3i-border-strong: #496079;
+  --e3i-accent: #D9A925;
+  --e3i-accent-hover: #E7BE51;
+  --e3i-gold: #D9A925;
+  --e3i-text-primary: #F5F6F2;
+  --e3i-text-secondary: #C6D0DA;
+  --e3i-text-muted: #93A2B2;
+  --e3i-success: #78A987;
+  --e3i-warning: #E7BE51;
+  --e3i-danger: #E29A94;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+:focus-visible {
+  outline: 3px solid #D9A925;
+  outline-offset: 3px;
+}
+
+.tabular-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.e3i-grid-bg {
+  background-image: linear-gradient(to right, rgba(30, 41, 59, 0.15) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(30, 41, 59, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
