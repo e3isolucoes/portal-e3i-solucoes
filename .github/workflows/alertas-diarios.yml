@@ -1,0 +1,50 @@
+name: Alertas diários de obrigações
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # 08:30 em America/Sao_Paulo (UTC-3), de segunda a sexta-feira.
+    - cron: '30 11 * * 1-5'
+
+jobs:
+  enviar-alertas:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: painel-obrigacoes
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - run: npm ci --ignore-scripts
+
+      - name: Check required secrets (skip if missing)
+        id: check_secrets
+        run: |
+          set -euo pipefail
+          missing=false
+          for v in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RESEND_API_KEY ALERT_FROM_EMAIL; do
+            if [ -z "${!v:-}" ]; then
+              echo "::warning::Secret $v is missing"
+              missing=true
+            fi
+          done
+          echo "configured=$([ "$missing" = false ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}
+
+      - name: Send alerts
+        if: steps.check_secrets.outputs.configured == 'true'
+        run: node scripts/enviar-alertas.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}
