@@ -51,7 +51,7 @@ jobs:
         run: npm test
       - name: Run AWS migration tests
         run: corepack pnpm test
-        working-directory: aws/migration
+        working-directory: painel-obrigacoes/aws/migration
       - name: Check governance controls
         run: npm run governance
       - name: Check JavaScript syntax
