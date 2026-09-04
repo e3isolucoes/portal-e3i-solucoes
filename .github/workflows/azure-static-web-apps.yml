@@ -42,6 +42,11 @@ jobs:
       - name: Install AWS migration test dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
         working-directory: painel-obrigacoes/aws/migration
+      - name: Create safe test configuration
+        run: node scripts/write-public-config.mjs
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: public-test-key-with-safe-length
       - name: Run tests
         run: npm test
       - name: Run AWS migration tests
@@ -67,6 +72,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
+      - name: Generate public browser configuration
+        run: node scripts/write-public-config.mjs
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       - name: Deploy static app and API
         uses: Azure/static-web-apps-deploy@v1
         with:

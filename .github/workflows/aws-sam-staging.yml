@@ -48,6 +48,11 @@ jobs:
       - name: Install AWS migration dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
         working-directory: painel-obrigacoes/aws/migration
+      - name: Create safe test configuration
+        run: node scripts/write-public-config.mjs
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: public-test-key-with-safe-length
       - name: Run automated checks
         run: |
           npm test
