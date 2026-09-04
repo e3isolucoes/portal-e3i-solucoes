@@ -51,7 +51,7 @@ jobs:
       - name: Create safe test configuration
         run: node scripts/write-public-config.mjs
         env:
-          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_URL: https://fsyginnpvonruifetjjs.supabase.co
           SUPABASE_ANON_KEY: public-test-key-with-safe-length
       - name: Run automated checks
         run: |

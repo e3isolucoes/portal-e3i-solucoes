@@ -10,8 +10,9 @@ if (!key || key.length < 20) {
   throw new Error('SUPABASE_ANON_KEY pública ausente ou inválida.');
 }
 
-const content = `export const SUPABASE_URL = ${JSON.stringify(url)};
-export const SUPABASE_ANON_KEY = ${JSON.stringify(key)};
+const quote = (value) => `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
+const content = `export const SUPABASE_URL = ${quote(url)};
+export const SUPABASE_ANON_KEY = ${quote(key)};
 `;
 
 writeFileSync(new URL('../js/config.js', import.meta.url), content, { encoding: 'utf8', mode: 0o600 });

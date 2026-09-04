@@ -29,7 +29,7 @@ jobs:
         run: node scripts/write-public-config.mjs
         working-directory: painel-obrigacoes
         env:
-          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_URL: https://fsyginnpvonruifetjjs.supabase.co
           SUPABASE_ANON_KEY: public-test-key-with-safe-length
       - name: Validate Portal authentication paths
         run: node --test test/cognitoSso.test.js test/portalAuth.test.js test/portalOnlyAccess.test.js
