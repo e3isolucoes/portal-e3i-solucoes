@@ -1,0 +1,6 @@
+interface:
+  display_name: "Portal E3i Solucoes"
+  short_description: "Repo-specific patterns and workflows for portal-e3i-solucoes"
+  default_prompt: "Use the portal-e3i-solucoes repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
