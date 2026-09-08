@@ -173,3 +173,27 @@ test('relações relevantes não aceitam referências entre tenants', async () =
     await assert.rejects(new Repository(client, 'table').create(auth, entity, payload), error => error.statusCode === 400 && error.message === `Referência inválida: ${field}.`);
   }
 });
+
+test('exclusão grava estado pendente e outbox atomicamente antes de qualquer efeito externo', async () => {
+  const current = completion('completion-delete', { attachment_path: 'painel-obrigacoes/dev/empresa-a/file.pdf' });
+  const client = transactionalClient([current]);
+  const result = await new Repository(client, 'table').remove(auth, 'completions', current.id);
+  const saved = client.state.get(`${tenantKey}|${current.SK}`);
+  assert.equal(saved.deletion_pending, true);
+  assert.equal(saved.deletion_event_id, result.eventId);
+  assert.equal(client.state.get(`${tenantKey}|OUTBOX#DELETE#${result.eventId}`).attachment_path, current.attachment_path);
+});
+
+test('falha do DynamoDB não altera o registro nem cria outbox', async () => {
+  const current = completion('completion-failure', { attachment_path: 'file.pdf' });
+  const client = {
+    calls: 0,
+    send: async command => {
+      client.calls += 1;
+      if (command.input.Key) return { Item: structuredClone(current) };
+      throw new Error('dynamodb unavailable');
+    }
+  };
+  await assert.rejects(new Repository(client, 'table').remove(auth, 'completions', current.id), /dynamodb unavailable/);
+  assert.equal(client.calls, 2);
+});

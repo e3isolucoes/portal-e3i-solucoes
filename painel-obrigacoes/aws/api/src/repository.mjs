@@ -23,7 +23,7 @@ export class Repository {
       ExclusiveStartKey: exclusiveStartKey
     }));
     return {
-      items: (result.Items || []).map(publicRecord),
+      items: (result.Items || []).filter(item => !item.deletion_pending).map(publicRecord),
       cursor: result.LastEvaluatedKey ? encodeCursor(result.LastEvaluatedKey) : null
     };
   }
@@ -33,7 +33,7 @@ export class Repository {
     requireModuleGrant(auth, config.grant);
     requireRole(auth, config.read);
     const result = await this.client.send(new GetCommand({ TableName: this.tableName, Key: { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id) } }));
-    return publicRecord(result.Item);
+    return result.Item?.deletion_pending ? null : publicRecord(result.Item);
   }
 
   async create(auth, entity, input) {
@@ -74,6 +74,7 @@ export class Repository {
     const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, safePatch) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;
     if (!current) throw Object.assign(new Error('Registro não encontrado.'), { statusCode: 404 });
+    if (current.deletion_pending) throw Object.assign(new Error('Registro com exclusão pendente.'), { statusCode: 409 });
     await this.requireRelationships(auth, entity, { ...publicRecord(current), ...safePatch });
     const expectedVersion = Number(safePatch.version ?? current.version ?? 1);
     if (expectedVersion !== Number(current.version ?? 1)) throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
@@ -121,15 +122,17 @@ export class Repository {
     requireRole(auth, config.write);
     const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;
-    if (!current) return;
-    const uniqueDelete = entity === 'completions'
-      ? { Delete: { TableName: this.tableName, Key: { PK: key.PK, SK: `UNIQUE#COMPLETION#${current.obligation_id}#${current.occurrence_date}` } } }
-      : null;
+    if (!current) return null;
+    if (current.deletion_pending && current.deletion_event_id) return { eventId: current.deletion_event_id };
+    const timestamp = now(); const eventId = randomUUID();
+    const pending = { ...current, deletion_pending: true, deletion_event_id: eventId, deletion_requested_at: timestamp, updated_at: timestamp };
+    const outbox = { PK: key.PK, SK: `OUTBOX#DELETE#${eventId}`, id: eventId, entityType: 'file_deletion_outbox', eventType: 'DELETE_ENTITY', workspace_id: auth.workspaceId, entity, entity_id: id, entity_sk: key.SK, attachment_path: current.attachment_path, obligation_id: current.obligation_id, occurrence_date: current.occurrence_date, created_at: timestamp, schemaVersion: SCHEMA_VERSION };
     await this.client.send(new TransactWriteCommand({ TransactItems: [
-      { Delete: { TableName: this.tableName, Key: key, ConditionExpression: 'attribute_exists(PK)' } },
-      ...(uniqueDelete ? [uniqueDelete] : []),
-      { Put: { TableName: this.tableName, Item: this.auditItem(auth, 'DELETE', entity, id, publicRecord(current), null) } }
+      { Put: { TableName: this.tableName, Item: pending, ConditionExpression: 'attribute_exists(PK) AND attribute_exists(SK) AND attribute_not_exists(deletion_pending)' } },
+      { Put: { TableName: this.tableName, Item: outbox, ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)' } },
+      { Put: { TableName: this.tableName, Item: this.auditItem(auth, 'DELETE_REQUESTED', entity, id, publicRecord(current), publicRecord(pending)) } }
     ] }));
+    return { eventId };
   }
 
   auditItem(auth, action, entity, entityId, before, after) {

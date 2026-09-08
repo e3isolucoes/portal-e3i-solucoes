@@ -23,6 +23,23 @@ O reset de senha continua no Supabase Auth até a migração separada para Amazo
 Cognito. Isso evita invalidar sessões ou bloquear usuários durante o corte do
 plano de dados e das notificações.
 
+## Exclusão confiável de comprovantes
+
+`DELETE` responde `202` depois que uma transação marca o registro como
+`deletion_pending` e grava o evento outbox. Um EventBridge Pipe entrega os novos
+eventos do DynamoDB Streams à fila SQS; a Lambda remove o objeto S3 e somente
+então finaliza registro, lock, outbox e auditoria em uma transação idempotente.
+A fila tenta cinco vezes antes da DLQ. Alarmes cobrem tentativas repetidamente
+falhas e mensagens definitivas na DLQ.
+
+A reconciliação diária percorre a tabela e o bucket, emite métricas
+`PendingDeletion`, `ReconciliationFailure`, `OrphanedObject` e
+`MissingReferencedObject`, tenta novamente cada outbox pendente e registra as
+chaves divergentes em JSON nos logs. Objetos órfãos são apenas reportados (não
+apagados automaticamente), para que retenção e investigação sejam aplicadas
+antes de uma remoção destrutiva; outboxes pendentes permanecem duráveis e podem
+ser reenviadas da stream/DLQ após a correção operacional.
+
 ## Fronteiras de isolamento
 
 - Uma stack, tabela e bucket por ferramenta e ambiente (`dev`, `staging`, `prod`).
