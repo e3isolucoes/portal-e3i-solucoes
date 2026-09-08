@@ -1,4 +1,17 @@
 (() => {
+  // Diagnóstico de CSP: mantém a política segura e registra a origem exata
+  // de qualquer violação futura sem habilitar eval() JavaScript.
+  window.addEventListener('securitypolicyviolation', (event) => {
+    console.error('[E3I CSP]', {
+      directive: event.effectiveDirective || event.violatedDirective,
+      blockedURI: event.blockedURI,
+      sourceFile: event.sourceFile,
+      lineNumber: event.lineNumber,
+      columnNumber: event.columnNumber,
+      sample: event.sample,
+    });
+  });
+
   const legacyRequested = new URLSearchParams(window.location.search).get('backend') === 'supabase';
 
   globalThis.E3I_CONFIG = Object.freeze({

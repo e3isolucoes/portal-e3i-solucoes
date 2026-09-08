@@ -5,7 +5,7 @@ import {
 import { escapeHtml } from '../dateUtils.js';
 import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
 import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js';
-import { suggestChecklist } from '../checklistSuggestions.js?v=20260814-sankhya-checklists-v1';
+import { suggestChecklist } from '../checklistSuggestions.js?v=20260908-csp-wasm-v2';
 
 let onSavedCallback = null;
 

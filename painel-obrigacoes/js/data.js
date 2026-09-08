@@ -1,7 +1,7 @@
 import {
   STATE, isAdmin, isSuperUser, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
-import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260813-create-rls-fix-v7';
+import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260908-csp-wasm-v2';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
 import {
   fetchCompanies, ensureCompany, createCompany, updateCompany, updateCompanyRegime, deleteCompany as apiDeleteCompany,
@@ -12,7 +12,7 @@ import { fetchAuditLog } from './api/auditLog.js';
 import {
   fetchChecklistItems, fetchAllChecklistItems, createChecklistItem, createChecklistItemsBulk, deleteChecklistItem as apiDeleteChecklistItem,
   toggleChecklistItem, resetChecklistItems,
-} from './api/checklist.js?v=20260814-sankhya-checklists-v1';
+} from './api/checklist.js?v=20260908-csp-wasm-v2';
 import { fetchHolidays, createHoliday, deleteHoliday as apiDeleteHoliday, fetchNationalHolidays } from './api/holidays.js';
 import {
   fetchObligationRules, createObligationRule, updateObligationRule, deleteObligationRule as apiDeleteObligationRule,
@@ -27,7 +27,7 @@ import {
 import { createUserAccount } from './api/adminUsers.js';
 import { signOut, sendPasswordResetEmail, fetchMyProfile } from './api/auth.js';
 import { uploadAttachment } from './api/storage.js';
-import { completeDialog } from './ui/completeDialog.js?v=20260817-optional-receipts-v2';
+import { completeDialog } from './ui/completeDialog.js?v=20260908-csp-wasm-v2';
 import { overrideDialog } from './ui/overrideDialog.js';
 import { applyRuleDialog } from './ui/applyRuleDialog.js';
 import { regimeDialog } from './ui/regimeDialog.js';
@@ -40,7 +40,7 @@ import { findClosestProfile } from './csv.js';
 import { fetchCategories } from './api/categories.js';
 import { applyCategories } from './constants.js';
 import { fetchWorkspaces, createWorkspace, updateWorkspace } from './api/workspaces.js';
-import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
+import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v=20260908-csp-wasm-v2';
 
 // Carrega as dez tabelas em paralelo. Cada uma é independente — se uma
 // falhar (ex.: sem conexão), as outras ainda tentam, e sinalizamos o erro

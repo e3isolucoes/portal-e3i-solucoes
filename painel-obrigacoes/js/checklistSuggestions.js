@@ -1,4 +1,4 @@
-import { getSankhyaChecklistSuggestions } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
+import { getSankhyaChecklistSuggestions } from './obligationChecklistTemplates.js?v=20260908-csp-wasm-v2';
 import { supabase } from './supabaseClient.js';
 
 // Rota relativa da Azure Function gerenciada pela mesma Static Web App. O
