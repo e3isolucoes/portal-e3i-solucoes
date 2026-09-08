@@ -56,7 +56,7 @@ test('aceita sessão Supabase do usuário já cadastrado no Portal mesmo com bac
   assert.equal(restored.data.session.auth_provider, 'supabase');
   assert.equal(restored.data.session.user.id, 'usuario-legado-1');
   assert.equal(restored.data.session.user.email, 'cadastrado@empresa.com');
-  assert.equal(restored.data.session.refresh_token, null);
+  assert.equal(restored.data.session.refresh_token, undefined);
   assert.equal((await getSession()).data.session.access_token, access_token);
   delete globalThis.E3I_CONFIG;
   delete globalThis.localStorage;
@@ -98,7 +98,7 @@ test('restaura sessão temporária da ferramenta sem exigir refresh token', asyn
 
   assert.equal(restored.error, null);
   assert.equal(restored.data.session.user.id, 'user-portal');
-  assert.equal(restored.data.session.refresh_token, null);
+  assert.equal(restored.data.session.refresh_token, undefined);
   delete globalThis.E3I_CONFIG;
   delete globalThis.localStorage;
 });
