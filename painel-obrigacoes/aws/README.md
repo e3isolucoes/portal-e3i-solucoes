@@ -2,11 +2,6 @@
 
 Esta pasta contém a transição governada do banco Supabase/PostgreSQL para DynamoDB e dos comprovantes para S3. O Supabase Auth permanece temporariamente como provedor de identidade; o navegador nunca recebe credenciais AWS e não acessa o DynamoDB diretamente.
 
-## Contrato de leitura e exclusão
-
-- `GET /v1/{entidade}/{id}` responde `404` quando o registro não existe ou está com exclusão pendente; o frontend não deve interpretar uma resposta bem-sucedida como `null`.
-- `DELETE /v1/{entidade}/{id}` é idempotente. A primeira solicitação aceita responde `202` com o identificador do evento de exclusão. Enquanto ela estiver pendente, repetições respondem `202` com o mesmo evento. Depois que o registro já estiver ausente, repetições respondem `204 No Content`.
-
 ## Notificações AWS
 
 O template provisiona uma Lambda dedicada que lê atividades, conclusões,

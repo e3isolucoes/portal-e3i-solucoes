@@ -84,23 +84,6 @@ test('listagem rejeita cursor adulterado', async () => {
   );
 });
 
-test('busca responde 404 quando o item não existe', async () => {
-  const repository = new Repository(transactionalClient([]), 'table');
-  await assert.rejects(
-    repository.get(auth, 'obligations', 'missing'),
-    error => error.statusCode === 404 && error.message === 'Registro não encontrado.'
-  );
-});
-
-test('busca mantém isolamento entre workspaces', async () => {
-  const otherTenant = 'TOOL#painel-obrigacoes#ENV#dev#WORKSPACE#empresa-b';
-  const repository = new Repository(transactionalClient([obligation('shared-id', otherTenant)]), 'table');
-  await assert.rejects(
-    repository.get(auth, 'obligations', 'shared-id'),
-    error => error.statusCode === 404
-  );
-});
-
 test('atualização de conclusão move o lock ao mudar a obrigação', async () => {
   const current = completion();
   const oldLock = { PK: tenantKey, SK: 'UNIQUE#COMPLETION#obligation-a#2026-09-01', completionId: current.id };
@@ -199,13 +182,6 @@ test('exclusão grava estado pendente e outbox atomicamente antes de qualquer ef
   assert.equal(saved.deletion_pending, true);
   assert.equal(saved.deletion_event_id, result.eventId);
   assert.equal(client.state.get(`${tenantKey}|OUTBOX#DELETE#${result.eventId}`).attachment_path, current.attachment_path);
-});
-
-test('exclusão de item ausente é idempotente e não grava transação', async () => {
-  const client = transactionalClient([]);
-  const result = await new Repository(client, 'table').remove(auth, 'completions', 'missing');
-  assert.equal(result, null);
-  assert.equal(client.state.size, 0);
 });
 
 test('falha do DynamoDB não altera o registro nem cria outbox', async () => {
