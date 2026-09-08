@@ -179,6 +179,9 @@ Resources:
         PointInTimeRecoveryEnabled: !If [IsProduction, true, false]
       SSESpecification:
         SSEEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
       Tags:
         - { Key: e3i:tool, Value: !Ref ToolId }
         - { Key: e3i:environment, Value: !Ref Environment }
