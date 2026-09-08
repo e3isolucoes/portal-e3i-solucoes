@@ -74,8 +74,8 @@ export async function handler(event) {
 
     const auth = await authenticate(event, ddb, process.env.TABLE_NAME);
     if (method === 'GET' && path === 'me') return response(200, { userId: auth.userId, email: auth.email, workspaceId: auth.workspaceId, role: auth.role, moduleGrants: auth.moduleGrants }, event);
-    if (path === 'files/upload-url' && method === 'POST') return response(200, await createUploadUrl(s3, process.env.FILES_BUCKET, auth, parseBody(event)), event);
-    if (path === 'files/download-url' && method === 'POST') return response(200, await createDownloadUrl(s3, process.env.FILES_BUCKET, auth, parseBody(event).path), event);
+    if (path === 'files/upload-url' && method === 'POST') return response(200, await createUploadUrl(s3, ddb, process.env.TABLE_NAME, process.env.FILES_BUCKET, auth, parseBody(event)), event);
+    if (path === 'files/download-url' && method === 'POST') return response(200, await createDownloadUrl(s3, ddb, process.env.TABLE_NAME, process.env.FILES_BUCKET, auth, parseBody(event).path), event);
 
     const [entity, id] = path.split('/').map(decodeURIComponent);
     if (method === 'GET' && !id) return response(200, await repository.list(auth, entity, listOptions(event)), event);
@@ -84,7 +84,7 @@ export async function handler(event) {
     if (method === 'PATCH' && id) return response(200, await repository.update(auth, entity, id, parseBody(event)), event);
     if (method === 'DELETE' && id) {
       const current = entity === 'completions' ? await repository.get(auth, entity, id) : null;
-      if (current?.attachment_path) await deleteStoredFile(s3, process.env.FILES_BUCKET, auth, current.attachment_path);
+      if (current?.attachment_path) await deleteStoredFile(s3, ddb, process.env.TABLE_NAME, process.env.FILES_BUCKET, auth, current.attachment_path);
       await repository.remove(auth, entity, id);
       return response(204, {}, event);
     }

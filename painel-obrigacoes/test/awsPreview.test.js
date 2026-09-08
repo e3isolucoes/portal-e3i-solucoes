@@ -48,9 +48,10 @@ test('exclusão de conclusão AWS também remove o comprovante do S3', async () 
   const handler = await readFile(new URL('../aws/api/src/handler.mjs', import.meta.url), 'utf8');
   const files = await readFile(new URL('../aws/api/src/files.mjs', import.meta.url), 'utf8');
   assert.match(handler, /current\?\.attachment_path/);
-  assert.match(handler, /deleteStoredFile\(s3, process\.env\.FILES_BUCKET/);
+  assert.match(handler, /deleteStoredFile\(s3, ddb, process\.env\.TABLE_NAME, process\.env\.FILES_BUCKET/);
   assert.match(files, /DeleteObjectCommand/);
-  assert.match(files, /path\?\.startsWith\(prefix\)/);
+  assert.match(files, /FILE_TOKEN\.exec\(path \|\| ''\)/);
+  assert.match(files, /Item\.state !== 'released'/);
 });
 
 test('infraestrutura de produção protege dados e monitora falhas sem permitir autoelevação do deployer', async () => {

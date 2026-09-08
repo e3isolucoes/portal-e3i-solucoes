@@ -92,6 +92,7 @@ jobs:
               Environment=staging \
               AllowedOrigin=https://obrigacoes.e3isolucoes.com.br \
               PortalProvisioningSecret=${{ secrets.PORTAL_PROVISIONING_SECRET }} \
+              ClamAvLayerArn=${{ secrets.CLAM_AV_LAYER_ARN }} \
               NotificationScheduleState=DISABLED
       - name: Enforce and verify API throttling
         shell: bash

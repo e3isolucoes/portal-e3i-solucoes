@@ -59,6 +59,9 @@ Parameters:
     Type: String
     Default: DISABLED
     AllowedValues: [ENABLED, DISABLED]
+  ClamAvLayerArn:
+    Type: String
+    Description: ARN da camada privada que fornece /opt/bin/clamscan e suas assinaturas atualizadas
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, prod]
@@ -235,6 +238,60 @@ Resources:
             ApiId: !Ref ServerlessHttpApi
             Path: /{proxy+}
             Method: ANY
+
+  FileScannerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: api/dist/
+      Handler: file-scanner.handler
+      FunctionName: !Sub e3i-${Environment}-${ToolId}-file-scanner
+      Role: !GetAtt FileScannerExecutionRole.Arn
+      MemorySize: 1024
+      Timeout: 120
+      Layers: [!Ref ClamAvLayerArn]
+      Events:
+        QuarantineUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref FilesBucket
+            Events: s3:ObjectCreated:Put
+            Filter:
+              S3Key:
+                Rules:
+                  - { Name: prefix, Value: !Sub '${ToolId}/${Environment}/' }
+
+  FileScannerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub e3i-${Environment}-${ToolId}-file-scanner
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: quarantine-scan-and-promote
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:DeleteObject, s3:PutObject]
+                Resource: !Sub ${FilesBucket.Arn}/*
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:UpdateItem]
+                Resource: !GetAtt DataTable.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/e3i-${Environment}-${ToolId}-file-scanner:*
+
+  FileScannerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${FileScannerFunction}
+      RetentionInDays: 30
 
   NotificationEmailIdentity:
     Type: AWS::SES::EmailIdentity
