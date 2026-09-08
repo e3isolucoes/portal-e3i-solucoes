@@ -1,0 +1,20 @@
+{
+  "name": "e3i-painel-obrigacoes-migration",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "plan": "node migrate.mjs --dry-run",
+    "migrate": "node migrate.mjs --execute",
+    "migrate:files": "node migrate-files.mjs --execute",
+    "reconcile": "node reconcile.mjs",
+    "verify:coverage": "node verify-coverage.mjs",
+    "verify:files": "node verify-files.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.883.0",
+    "@aws-sdk/client-dynamodb": "^3.883.0",
+    "@aws-sdk/client-s3": "^3.883.0",
+    "@aws-sdk/lib-dynamodb": "^3.883.0"
+  }
+}
