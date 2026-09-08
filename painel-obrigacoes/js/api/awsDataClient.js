@@ -59,6 +59,7 @@ export const awsData = Object.freeze({
     } while (cursor);
     return records;
   },
+  // Missing records reject with an HTTP 404 error; GET never resolves to null.
   get: (entity, id) => request(`${entity}/${encodeURIComponent(id)}`),
   create: (entity, values) => request(entity, { method: 'POST', body: values }),
   update: (entity, id, values) => request(`${entity}/${encodeURIComponent(id)}`, { method: 'PATCH', body: values }),
