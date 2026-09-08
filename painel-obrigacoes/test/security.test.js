@@ -6,8 +6,9 @@ test('CSP permits the resources required by fonts and OCR without unsafe-eval', 
   const config = JSON.parse(await readFile(new URL('../staticwebapp.config.json', import.meta.url), 'utf8'));
   const csp = config.globalHeaders['Content-Security-Policy'];
 
-  assert.match(csp, /script-src[^;]*'wasm-unsafe-eval'/);
+  assert.doesNotMatch(csp, /'wasm-unsafe-eval'/);
   assert.doesNotMatch(csp, /(?:^|\s)'unsafe-eval'(?:\s|;|$)/);
+  assert.match(await readFile(new URL('../index.html', import.meta.url), 'utf8'), /vendor\/supabase-2\.112\.3\/supabase\.js/);
   assert.match(csp, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
   assert.match(csp, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
   assert.match(csp, /frame-ancestors https:\/\/portal\.e3isolucoes\.com\.br/);

@@ -12,7 +12,9 @@ export const supabase = (isConfigured
   && typeof window !== 'undefined'
   && window.supabase
   && typeof window.supabase.createClient === 'function')
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  })
   : null;
 
 export function isSupabaseConfigured() {

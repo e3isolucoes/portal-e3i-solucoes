@@ -1,5 +1,5 @@
 // Leitura de comprovantes por OCR direto no navegador (Tesseract.js) e por
-// extração de texto de PDF (pdf.js) — ambos via CDN em index.html, sem
+// extração de texto de PDF (pdf.js) — carregados em versões fixas, sem
 // serviço externo pago nem backend próprio — para conferir se o arquivo
 // anexado parece ser da competência (mês/ano) da ocorrência sendo
 // concluída.

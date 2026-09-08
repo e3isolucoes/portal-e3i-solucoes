@@ -6,6 +6,7 @@ import { authenticate } from './auth.mjs';
 import { createDownloadUrl, createUploadUrl, deleteStoredFile } from './files.mjs';
 import { claimPortalProvisioningNonce, provisionPortalAccess, verifyPortalProvisioning } from './portal-provisioning.mjs';
 import { consumePortalSession, createPortalSession } from './portal-session.mjs';
+import { createPasswordSession, issueBrowserSession, readRefreshCookie, refreshCookie, revokeBrowserSession, rotateBrowserSession } from './browser-session.mjs';
 import { Repository } from './repository.mjs';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
@@ -20,8 +21,8 @@ function allowedOrigin(event) {
   return allowlist.includes(requested) ? requested : allowlist[0];
 }
 
-function response(statusCode, body, event) {
-  return { statusCode, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; frame-ancestors 'none'", 'strict-transport-security': 'max-age=31536000; includeSubDomains', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'access-control-allow-origin': allowedOrigin(event), 'access-control-allow-headers': 'authorization,content-type,x-workspace-id', 'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS', 'access-control-max-age': '600', vary: 'origin' }, body: statusCode === 204 ? '' : JSON.stringify(body) };
+function response(statusCode, body, event, extraHeaders = {}) {
+  return { statusCode, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; frame-ancestors 'none'", 'strict-transport-security': 'max-age=31536000; includeSubDomains', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'access-control-allow-origin': allowedOrigin(event), 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'authorization,content-type,x-workspace-id', 'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS', 'access-control-max-age': '600', vary: 'origin', ...extraHeaders }, body: statusCode === 204 ? '' : JSON.stringify(body) };
 }
 
 function parseBody(event) {
@@ -53,7 +54,22 @@ export async function handler(event) {
       return response(200, { ...access, ...session }, event);
     }
     if (method === 'POST' && path === 'portal-session/exchange') {
-      return response(200, await consumePortalSession(ddb, process.env.TABLE_NAME, parseBody(event).code), event);
+      const session = await consumePortalSession(ddb, process.env.TABLE_NAME, parseBody(event).code);
+      const cookieToken = await issueBrowserSession(ddb, process.env.TABLE_NAME, session.refresh_token);
+      return response(200, { access_token: session.access_token, cognito_access_token: session.cognito_access_token }, event, { 'set-cookie': refreshCookie(cookieToken) });
+    }
+    if (method === 'POST' && path === 'session/login') {
+      const input = parseBody(event);
+      const created = await createPasswordSession(cognito, ddb, process.env.TABLE_NAME, { userPoolId: process.env.USER_POOL_ID, clientId: process.env.USER_POOL_CLIENT_ID }, String(input.email || '').trim().toLowerCase(), String(input.password || ''));
+      return response(200, { access_token: created.access_token, cognito_access_token: created.cognito_access_token }, event, { 'set-cookie': refreshCookie(created.cookieToken) });
+    }
+    if (method === 'POST' && path === 'session/refresh') {
+      const rotated = await rotateBrowserSession(cognito, ddb, process.env.TABLE_NAME, { userPoolId: process.env.USER_POOL_ID, clientId: process.env.USER_POOL_CLIENT_ID }, readRefreshCookie(event.headers));
+      return response(200, { access_token: rotated.access_token, cognito_access_token: rotated.cognito_access_token }, event, { 'set-cookie': refreshCookie(rotated.cookieToken) });
+    }
+    if (method === 'DELETE' && path === 'session') {
+      await revokeBrowserSession(cognito, ddb, process.env.TABLE_NAME, process.env.USER_POOL_CLIENT_ID, readRefreshCookie(event.headers));
+      return response(204, {}, event, { 'set-cookie': refreshCookie('', 0) });
     }
 
     const auth = await authenticate(event, ddb, process.env.TABLE_NAME);
