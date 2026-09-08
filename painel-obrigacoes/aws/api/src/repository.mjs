@@ -75,16 +75,40 @@ export class Repository {
     const expectedVersion = Number(patch.version ?? current.version ?? 1);
     if (expectedVersion !== Number(current.version ?? 1)) throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
     const item = { ...current, ...safePatch, version: expectedVersion + 1, updated_at: now() };
-    await this.client.send(new TransactWriteCommand({ TransactItems: [
-      { Put: {
-        TableName: this.tableName,
-        Item: item,
-        ConditionExpression: 'attribute_exists(PK) AND attribute_exists(SK) AND (attribute_not_exists(#version) OR #version = :expectedVersion)',
-        ExpressionAttributeNames: { '#version': 'version' },
-        ExpressionAttributeValues: { ':expectedVersion': expectedVersion }
-      } },
-      { Put: { TableName: this.tableName, Item: this.auditItem(auth, 'UPDATE', entity, id, publicRecord(current), publicRecord(item)) } }
-    ] }));
+    const occurrenceChanged = entity === 'completions'
+      && (item.obligation_id !== current.obligation_id || item.occurrence_date !== current.occurrence_date);
+    const lockChanges = occurrenceChanged
+      ? [
+          { Delete: {
+            TableName: this.tableName,
+            Key: { PK: key.PK, SK: `UNIQUE#COMPLETION#${current.obligation_id}#${current.occurrence_date}` },
+            ConditionExpression: '#completionId = :completionId',
+            ExpressionAttributeNames: { '#completionId': 'completionId' },
+            ExpressionAttributeValues: { ':completionId': id }
+          } },
+          { Put: {
+            TableName: this.tableName,
+            Item: { PK: key.PK, SK: `UNIQUE#COMPLETION#${item.obligation_id}#${item.occurrence_date}`, entityType: 'uniqueness_lock', completionId: id },
+            ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)'
+          } }
+        ]
+      : [];
+    try {
+      await this.client.send(new TransactWriteCommand({ TransactItems: [
+        { Put: {
+          TableName: this.tableName,
+          Item: item,
+          ConditionExpression: 'attribute_exists(PK) AND attribute_exists(SK) AND (attribute_not_exists(#version) OR #version = :expectedVersion)',
+          ExpressionAttributeNames: { '#version': 'version' },
+          ExpressionAttributeValues: { ':expectedVersion': expectedVersion }
+        } },
+        ...lockChanges,
+        { Put: { TableName: this.tableName, Item: this.auditItem(auth, 'UPDATE', entity, id, publicRecord(current), publicRecord(item)) } }
+      ] }));
+    } catch (error) {
+      if (error.name === 'TransactionCanceledException') throw Object.assign(new Error('Registro já existente ou concorrência detectada.'), { statusCode: 409 });
+      throw error;
+    }
     return publicRecord(item);
   }
 
