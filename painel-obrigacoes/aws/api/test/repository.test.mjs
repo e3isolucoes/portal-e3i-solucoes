@@ -156,6 +156,14 @@ test('criação de conclusão rejeita obrigação existente somente em outro ten
 });
 
 test('relações relevantes não aceitam referências entre tenants', async () => {
+  // 'companies' e 'tax_regime_rules' exigem papel manager/admin para escrita
+  // (ver entityConfig em model.mjs); usar o 'auth' padrão (role: 'member')
+  // faria requireRole() barrar essas duas entidades antes mesmo de chegar
+  // na validação de referência entre tenants, mascarando o que este teste
+  // realmente verifica. Um papel com permissão de escrita em todas as
+  // entidades do caso garante que a falha observada seja sempre a de
+  // referência inválida, nunca a de permissão.
+  const adminAuth = { ...auth, role: 'admin' };
   const otherTenant = 'TOOL#painel-obrigacoes#ENV#dev#WORKSPACE#empresa-b';
   const cases = [
     ['obligation_comments', { obligation_id: 'obligation-b', author_name: 'Usuário', body: 'Texto' }, 'obligation_id'],
@@ -170,7 +178,7 @@ test('relações relevantes não aceitam referências entre tenants', async () =
       { PK: otherTenant, SK: 'TAX_REGIME#regime-b', id: 'regime-b' },
       { PK: otherTenant, SK: 'RULE#rule-b', id: 'rule-b' }
     ]);
-    await assert.rejects(new Repository(client, 'table').create(auth, entity, payload), error => error.statusCode === 400 && error.message === `Referência inválida: ${field}.`);
+    await assert.rejects(new Repository(client, 'table').create(adminAuth, entity, payload), error => error.statusCode === 400 && error.message === `Referência inválida: ${field}.`);
   }
 });
 
