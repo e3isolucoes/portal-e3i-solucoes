@@ -6,11 +6,16 @@ import {
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { DeleteCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { APP_ENV, TOOL_ID } from './model.mjs';
 
 const SESSION_TTL_SECONDS = 60;
 const CODE_PATTERN = /^[A-Za-z0-9_-]{40,100}$/;
+
+function credentialKey(userId) {
+  const digest = createHash('sha256').update(userId, 'utf8').digest('hex');
+  return { PK: `PORTAL_COGNITO#${digest}`, SK: `PORTAL_COGNITO#${digest}` };
+}
 
 function codeKey(code) {
   const digest = createHash('sha256').update(code, 'utf8').digest('hex');
@@ -38,35 +43,57 @@ async function ensureCognitoUser(cognito, { userPoolId, email, userId, displayNa
         { Name: 'custom:legacy_user_id', Value: userId },
       ],
     }));
-    return;
+    return { created: true };
   }
   const attributes = attributeMap(current.UserAttributes);
   if (attributes['custom:legacy_user_id'] && attributes['custom:legacy_user_id'] !== userId) {
     throw Object.assign(new Error('Conta Cognito vinculada a outro usuário.'), { statusCode: 409 });
   }
+  if (!attributes['custom:legacy_user_id']) {
+    throw Object.assign(new Error('Conta existente não gerenciada pelo portal; use federação ou autenticação própria.'), { statusCode: 409 });
+  }
   const updates = [
     { Name: 'email_verified', Value: 'true' },
     { Name: 'name', Value: displayName },
   ];
-  if (!attributes['custom:legacy_user_id']) updates.push({ Name: 'custom:legacy_user_id', Value: userId });
   await cognito.send(new AdminUpdateUserAttributesCommand({ UserPoolId: userPoolId, Username: email, UserAttributes: updates }));
+  return { created: false };
 }
 
 export async function createPortalSession(cognito, documentClient, tableName, config, identity, now = Date.now()) {
   const { userPoolId, clientId } = config;
   if (!userPoolId || !clientId) throw Object.assign(new Error('Cognito não configurado.'), { statusCode: 503 });
-  await ensureCognitoUser(cognito, { userPoolId, ...identity });
-  const password = `A1!${randomBytes(32).toString('base64url')}`;
-  await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId: userPoolId, Username: identity.email, Password: password, Permanent: true }));
-  const authenticated = await cognito.send(new AdminInitiateAuthCommand({
-    UserPoolId: userPoolId,
-    ClientId: clientId,
-    AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
-    AuthParameters: { USERNAME: identity.email, PASSWORD: password },
+  const { created } = await ensureCognitoUser(cognito, { userPoolId, ...identity });
+  const storedCredential = await documentClient.send(new GetCommand({
+    TableName: tableName, Key: credentialKey(identity.userId), ConsistentRead: true,
   }));
+  let authenticated;
+  if (storedCredential.Item?.refreshToken) {
+    authenticated = await cognito.send(new AdminInitiateAuthCommand({
+      UserPoolId: userPoolId, ClientId: clientId, AuthFlow: 'REFRESH_TOKEN_AUTH',
+      AuthParameters: { REFRESH_TOKEN: storedCredential.Item.refreshToken },
+    }));
+  } else {
+    // Newly provisioned users (and a one-time migration of legacy portal-managed users)
+    // receive a random credential. Subsequent accesses exchange the refresh token instead.
+    const password = `A1!${randomBytes(32).toString('base64url')}`;
+    await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId: userPoolId, Username: identity.email, Password: password, Permanent: true }));
+    authenticated = await cognito.send(new AdminInitiateAuthCommand({
+      UserPoolId: userPoolId, ClientId: clientId, AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+      AuthParameters: { USERNAME: identity.email, PASSWORD: password },
+    }));
+  }
   const tokens = authenticated.AuthenticationResult;
   if (!tokens?.IdToken || !tokens?.AccessToken) throw new Error('Cognito não emitiu a sessão esperada.');
 
+  const refreshToken = tokens.RefreshToken || storedCredential.Item?.refreshToken;
+  if (!refreshToken) throw new Error('Cognito não emitiu credencial renovável.');
+  if (created || tokens.RefreshToken) {
+    await documentClient.send(new PutCommand({
+      TableName: tableName,
+      Item: { ...credentialKey(identity.userId), entityType: 'portal_cognito_credential', refreshToken, updated_at: new Date(now).toISOString() },
+    }));
+  }
   const launchCode = randomBytes(32).toString('base64url');
   const expiresAt = Math.floor(now / 1000) + SESSION_TTL_SECONDS;
   await documentClient.send(new PutCommand({
@@ -74,7 +101,7 @@ export async function createPortalSession(cognito, documentClient, tableName, co
     Item: {
       ...codeKey(launchCode), entityType: 'portal_session', toolId: TOOL_ID, environment: APP_ENV,
       userId: identity.userId, workspaceId: identity.workspaceId, expiresAt,
-      idToken: tokens.IdToken, accessToken: tokens.AccessToken, refreshToken: tokens.RefreshToken,
+      idToken: tokens.IdToken, accessToken: tokens.AccessToken, refreshToken,
       created_at: new Date(now).toISOString(),
     },
     ConditionExpression: 'attribute_not_exists(PK)',

@@ -4,7 +4,7 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider';
 import { authenticate } from './auth.mjs';
 import { createDownloadUrl, createUploadUrl, deleteStoredFile } from './files.mjs';
-import { provisionPortalAccess, verifyPortalProvisioning } from './portal-provisioning.mjs';
+import { claimPortalProvisioningNonce, provisionPortalAccess, verifyPortalProvisioning } from './portal-provisioning.mjs';
 import { consumePortalSession, createPortalSession } from './portal-session.mjs';
 import { Repository } from './repository.mjs';
 
@@ -43,7 +43,8 @@ export async function handler(event) {
     const method = event.requestContext?.http?.method || event.httpMethod;
     const path = (event.rawPath || event.path || '/').replace(/^\/v1\/?/, '');
     if (method === 'POST' && path === 'internal/portal-access') {
-      verifyPortalProvisioning(event, process.env.PORTAL_PROVISIONING_SECRET);
+      const verified = verifyPortalProvisioning(event, process.env.PORTAL_PROVISIONING_SECRET);
+      await claimPortalProvisioningNonce(ddb, process.env.TABLE_NAME, verified.nonce);
       const input = parseBody(event);
       const access = await provisionPortalAccess(ddb, process.env.TABLE_NAME, input);
       const session = await createPortalSession(cognito, ddb, process.env.TABLE_NAME, {

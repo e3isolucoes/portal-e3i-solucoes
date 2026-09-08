@@ -1,8 +1,10 @@
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { PutCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { APP_ENV, membershipPk, SCHEMA_VERSION, tenantPk, TOOL_ID } from './model.mjs';
 
 const MAX_CLOCK_SKEW_MS = 2 * 60 * 1000;
+const NONCE_TTL_SECONDS = Math.ceil(MAX_CLOCK_SKEW_MS / 1000) + 30;
+const NONCE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 const IDENTIFIER = /^[a-zA-Z0-9_-]{1,80}$/;
 
 function header(headers, name) {
@@ -15,8 +17,8 @@ function safeEqualHex(left, right) {
   return timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
 }
 
-export function signPortalProvisioning(secret, timestamp, rawBody) {
-  return createHmac('sha256', secret).update(`${timestamp}.${rawBody}`, 'utf8').digest('hex');
+export function signPortalProvisioning(secret, timestamp, nonce, rawBody) {
+  return createHmac('sha256', secret).update(`${timestamp}.${nonce}.${rawBody}`, 'utf8').digest('hex');
 }
 
 export function verifyPortalProvisioning(event, secret, now = Date.now()) {
@@ -24,14 +26,39 @@ export function verifyPortalProvisioning(event, secret, now = Date.now()) {
     throw Object.assign(new Error('Integração do Portal E3I não configurada.'), { statusCode: 503 });
   }
   const timestamp = header(event.headers, 'x-e3i-timestamp');
+  const nonce = header(event.headers, 'x-e3i-nonce') || header(event.headers, 'x-request-id');
   const signature = header(event.headers, 'x-e3i-signature');
   const timestampMs = Number(timestamp);
   if (!Number.isFinite(timestampMs) || Math.abs(now - timestampMs) > MAX_CLOCK_SKEW_MS) {
     throw Object.assign(new Error('Solicitação de acesso expirada.'), { statusCode: 401 });
   }
-  const expected = signPortalProvisioning(secret, timestamp, event.body || '');
+  if (!NONCE_PATTERN.test(nonce)) {
+    throw Object.assign(new Error('Nonce criptográfico obrigatório ou inválido.'), { statusCode: 401 });
+  }
+  const expected = signPortalProvisioning(secret, timestamp, nonce, event.body || '');
   if (!safeEqualHex(signature, expected)) {
     throw Object.assign(new Error('Assinatura do Portal E3I inválida.'), { statusCode: 401 });
+  }
+  return { nonce, timestampMs };
+}
+
+export async function claimPortalProvisioningNonce(client, tableName, nonce, now = Date.now()) {
+  const digest = createHash('sha256').update(nonce, 'utf8').digest('hex');
+  try {
+    await client.send(new PutCommand({
+      TableName: tableName,
+      Item: {
+        PK: `PORTAL_NONCE#${digest}`, SK: `PORTAL_NONCE#${digest}`,
+        entityType: 'portal_provisioning_nonce', expiresAt: Math.floor(now / 1000) + NONCE_TTL_SECONDS,
+        created_at: new Date(now).toISOString(),
+      },
+      ConditionExpression: 'attribute_not_exists(PK)',
+    }));
+  } catch (error) {
+    if (error?.name === 'ConditionalCheckFailedException') {
+      throw Object.assign(new Error('Nonce já utilizado.'), { statusCode: 409 });
+    }
+    throw error;
   }
 }
 
