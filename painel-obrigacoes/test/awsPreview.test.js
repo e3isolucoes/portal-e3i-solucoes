@@ -35,7 +35,10 @@ test('falha em dados complementares não impede a abertura do painel AWS', async
 test('conclusões criadas na AWS recebem data de conclusão compatível com o painel', async () => {
   const repository = await readFile(new URL('../aws/api/src/repository.mjs', import.meta.url), 'utf8');
   assert.match(repository, /entity === 'completions'/);
-  assert.match(repository, /done_at: input\.done_at \|\| timestamp/);
+  // done_at é lido do payload já validado (validateCreate), não do input
+  // bruto — validated.done_at passa pelo validador de timestamp antes de
+  // ser gravado.
+  assert.match(repository, /done_at: validated\.done_at \|\| timestamp/);
 });
 
 test('histórico continua carregando para conclusões AWS legadas sem done_at', async () => {
@@ -45,10 +48,17 @@ test('histórico continua carregando para conclusões AWS legadas sem done_at', 
 });
 
 test('exclusão de conclusão AWS também remove o comprovante do S3', async () => {
-  const handler = await readFile(new URL('../aws/api/src/handler.mjs', import.meta.url), 'utf8');
+  // A exclusão não chama o S3 de forma síncrona no handler: o Repository.remove()
+  // grava, na mesma transação do DynamoDB, um registro pendente e um evento na
+  // fila outbox (com attachment_path), e o deletion-worker consome esse evento
+  // de forma assíncrona/idempotente para remover o objeto do S3. Isso evita
+  // apagar o registro no banco e falhar ao apagar o arquivo (ou vice-versa).
+  const repository = await readFile(new URL('../aws/api/src/repository.mjs', import.meta.url), 'utf8');
+  const worker = await readFile(new URL('../aws/api/src/deletion-worker.mjs', import.meta.url), 'utf8');
   const files = await readFile(new URL('../aws/api/src/files.mjs', import.meta.url), 'utf8');
-  assert.match(handler, /current\?\.attachment_path/);
-  assert.match(handler, /deleteStoredFile\(s3, process\.env\.FILES_BUCKET/);
+  assert.match(repository, /entityType: 'file_deletion_outbox'/);
+  assert.match(repository, /attachment_path: current\.attachment_path/);
+  assert.match(worker, /if \(event\.attachment_path\) await s3\.send\(new DeleteObjectCommand/);
   assert.match(files, /DeleteObjectCommand/);
   assert.match(files, /path\?\.startsWith\(prefix\)/);
 });
