@@ -5,6 +5,19 @@ import { CATEGORIES, FREQUENCIES, DAY_TYPES } from './constants.js';
 // exportadas de configurações regionais diferentes).
 export const CSV_COLUMNS = ['nome', 'categoria', 'empresa', 'responsavel', 'frequencia', 'tipo_dia', 'dia', 'mes', 'meses', 'data', 'observacoes'];
 
+const XLSX_ESM_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/xlsx.mjs';
+let xlsxModulePromise = null;
+
+async function getXlsxModule() {
+  if (!xlsxModulePromise) {
+    xlsxModulePromise = import(XLSX_ESM_URL).catch((error) => {
+      xlsxModulePromise = null;
+      throw new Error(`Não foi possível carregar o leitor de Excel: ${error.message}`);
+    });
+  }
+  return xlsxModulePromise;
+}
+
 function normalizeHeader(header) {
   return (header || '').replace(/^\ufeff/, '').trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -39,11 +52,11 @@ export async function parseCsvFile(file) {
   const buffer = await file.arrayBuffer();
 
   if (extension === 'xlsx' || extension === 'xls') {
-    if (!window.XLSX) throw new Error('Biblioteca de leitura de Excel não carregou. Recarregue a página e tente de novo.');
-    const workbook = window.XLSX.read(buffer, { type: 'array' });
+    const XLSX = await getXlsxModule();
+    const workbook = XLSX.read(buffer, { type: 'array' });
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
     if (!firstSheet) return [];
-    return window.XLSX.utils.sheet_to_json(firstSheet, {
+    return XLSX.utils.sheet_to_json(firstSheet, {
       defval: '',
       raw: false,
       blankrows: false,

@@ -93,13 +93,22 @@ function renderNotificationBell() {
   + '</div>';
 }
 
-function bodyForView() {
-  return resolveView(STATE.view).render();
+function bodyForView(view) {
+  if (!view || typeof view.render !== 'function') {
+    console.error('Falha ao resolver a visualização atual', { view: STATE.view });
+    return '<div class="empty" role="alert">Não foi possível abrir esta área. Volte ao painel principal e tente novamente.</div>';
+  }
+  return view.render();
 }
 
 export function render() {
   const app = document.getElementById('app');
-  const body = bodyForView();
+  if (!app) {
+    console.error('Elemento raiz #app não encontrado.');
+    return;
+  }
+  const view = resolveView(STATE.view);
+  const body = bodyForView(view);
   const roleLabel = isSuperUser() ? 'Superusuário' : (isAdmin() ? 'Admin' : (isManager() ? 'Gestor' : 'Membro'));
 
   app.innerHTML = '<header class="topbar">'
@@ -119,7 +128,7 @@ export function render() {
   // Precisa vir depois do innerHTML: o módulo desenha dentro do container e
   // registra os próprios cliques. Como render() recria o innerHTML inteiro, a
   // fila é remontada a cada render — por isso a chamada fica aqui, e não no boot.
-  resolveView(STATE.view).mount?.();
+  view?.mount?.();
 
   if (!appClickBound) {
     app.addEventListener('click', onAppClick);

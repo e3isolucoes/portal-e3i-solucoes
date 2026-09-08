@@ -8,9 +8,35 @@
 // fixadas no jsDelivr.
 
 const JSDELIVR_BASE = 'https://cdn.jsdelivr.net';
+const PDFJS_VERSION = '4.10.38';
+const PDFJS_MODULE_URL = `${JSDELIVR_BASE}/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.mjs`;
+const PDFJS_WORKER_URL = `${JSDELIVR_BASE}/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+const TESSERACT_MODULE_URL = `${JSDELIVR_BASE}/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js`;
 
-if (typeof window !== 'undefined' && window.pdfjsLib) {
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${JSDELIVR_BASE}/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+let _pdfJsPromise = null;
+let _tesseractModulePromise = null;
+
+async function getPdfJs() {
+  if (!_pdfJsPromise) {
+    _pdfJsPromise = import(PDFJS_MODULE_URL).then((pdfjsLib) => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      return pdfjsLib;
+    }).catch((error) => {
+      _pdfJsPromise = null;
+      throw new Error(`Não foi possível carregar o leitor de PDF: ${error.message}`);
+    });
+  }
+  return _pdfJsPromise;
+}
+
+async function getTesseractModule() {
+  if (!_tesseractModulePromise) {
+    _tesseractModulePromise = import(TESSERACT_MODULE_URL).catch((error) => {
+      _tesseractModulePromise = null;
+      throw new Error(`Não foi possível carregar o OCR: ${error.message}`);
+    });
+  }
+  return _tesseractModulePromise;
 }
 
 const PDF_MIN_TEXT_LENGTH = 25;
@@ -74,7 +100,8 @@ async function extractPdfText(file) {
   // de não ser necessário para a leitura dos comprovantes, isso é bloqueado
   // pela nossa CSP. Desabilitar explicitamente o recurso mantém a política
   // segura sem recorrer a `unsafe-eval`.
-  const pdf = await window.pdfjsLib.getDocument({
+  const pdfjsLib = await getPdfJs();
+  const pdf = await pdfjsLib.getDocument({
     data: buffer,
     isEvalSupported: false,
   }).promise;
@@ -110,8 +137,9 @@ async function getTesseractWorker() {
   if (_tessWorker) return _tessWorker;
   if (_tessWorkerInitPromise) return _tessWorkerInitPromise;
 
-  if (typeof window === 'undefined' || !window.Tesseract || !window.Tesseract.createWorker) {
-    throw new Error('Tesseract não está disponível (assegure que o script foi carregado via CDN em index.html)');
+  const Tesseract = await getTesseractModule();
+  if (typeof Tesseract.createWorker !== 'function') {
+    throw new Error('Módulo do Tesseract carregado sem createWorker().');
   }
 
   const workerPath = `${JSDELIVR_BASE}/npm/tesseract.js@5.1.1/dist/worker.min.js`;
@@ -119,7 +147,7 @@ async function getTesseractWorker() {
   const langPath = `${JSDELIVR_BASE}/npm/@tesseract.js-data/por@1.0.0/4.0.0_best_int`;
 
   // A assinatura do Tesseract.js 5 recebe idioma/OEM antes das opções.
-  _tessWorkerInitPromise = window.Tesseract.createWorker('por', 1, {
+  _tessWorkerInitPromise = Tesseract.createWorker('por', 1, {
     workerPath,
     corePath,
     langPath,
@@ -153,7 +181,6 @@ async function tesseractRecognize(target) {
 // --- text extraction (PDF or image) --------------------------------------
 async function extractText(file) {
   if (file.type === 'application/pdf') {
-    if (!window.pdfjsLib) throw new Error('pdf.js não carregou');
     const { pdf, text: pdfText } = await extractPdfText(file);
     if (pdfText.replace(/\s+/g, '').length >= PDF_MIN_TEXT_LENGTH) {
       return pdfText; // PDF nativo, já tem camada de texto — não precisa de OCR
