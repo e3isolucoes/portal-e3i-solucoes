@@ -30,6 +30,14 @@ test('deployment remains connected to the existing Supabase project', async () =
   assert.doesNotMatch(config, /SEU_PROJETO|sb_publishable_\.\.\./);
 });
 
+test('AWS panel keeps a safe public configuration module in the repository', async () => {
+  const config = await readFile(new URL('../js/config.js', import.meta.url), 'utf8');
+  const ignore = await readFile(new URL('../.gitignore', import.meta.url), 'utf8');
+
+  assert.match(config, /SUPABASE_ANON_KEY = ''/);
+  assert.doesNotMatch(ignore, /(?:^|\n)js\/config\.js(?:\n|$)/);
+});
+
 test('admin can complete an activity without a second validator', async () => {
   const schema = await readFile(new URL('../sql/schema.sql', import.meta.url), 'utf8');
   const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
