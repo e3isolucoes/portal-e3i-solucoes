@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { entityConfig, entitySk, publicRecord, SCHEMA_VERSION, tenantPk, TOOL_ID, APP_ENV } from './model.mjs';
 import { requireModuleGrant, requireRole } from './auth.mjs';
+import { entityRelationships, validateCreate, validateUpdate } from './validators.mjs';
 
 const now = () => new Date().toISOString();
 
@@ -39,12 +40,14 @@ export class Repository {
     const config = entityConfig(entity);
     requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
-    const id = input.id || randomUUID();
+    const validated = validateCreate(entity, input);
+    await this.requireRelationships(auth, entity, validated);
+    const id = validated.id || randomUUID();
     const timestamp = now();
     const entityDefaults = entity === 'completions'
-      ? { done_at: input.done_at || timestamp }
+      ? { done_at: validated.done_at || timestamp }
       : {};
-    const record = { ...input, ...entityDefaults, id, version: 1, toolId: TOOL_ID, environment: APP_ENV, workspace_id: auth.workspaceId, entityType: entity, schemaVersion: SCHEMA_VERSION, created_at: input.created_at || timestamp, updated_at: timestamp };
+    const record = { ...validated, ...entityDefaults, id, version: 1, toolId: TOOL_ID, environment: APP_ENV, workspace_id: auth.workspaceId, entityType: entity, schemaVersion: SCHEMA_VERSION, created_at: timestamp, updated_at: timestamp };
     const item = { ...record, PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, record) };
     const audit = this.auditItem(auth, 'INSERT', entity, id, null, record);
     const uniqueOccurrence = entity === 'completions'
@@ -67,12 +70,12 @@ export class Repository {
     const config = entityConfig(entity);
     requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
-    const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, patch) };
+    const safePatch = validateUpdate(entity, patch);
+    const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, safePatch) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;
     if (!current) throw Object.assign(new Error('Registro não encontrado.'), { statusCode: 404 });
-    const immutable = new Set(['PK', 'SK', 'workspace_id', 'toolId', 'environment', 'entityType', 'schemaVersion', 'created_at', 'id']);
-    const safePatch = Object.fromEntries(Object.entries(patch).filter(([keyName]) => !immutable.has(keyName)));
-    const expectedVersion = Number(patch.version ?? current.version ?? 1);
+    await this.requireRelationships(auth, entity, { ...publicRecord(current), ...safePatch });
+    const expectedVersion = Number(safePatch.version ?? current.version ?? 1);
     if (expectedVersion !== Number(current.version ?? 1)) throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
     const item = { ...current, ...safePatch, version: expectedVersion + 1, updated_at: now() };
     const occurrenceChanged = entity === 'completions'
@@ -132,6 +135,19 @@ export class Repository {
   auditItem(auth, action, entity, entityId, before, after) {
     const timestamp = now(); const id = randomUUID();
     return { PK: tenantPk(auth.workspaceId), SK: `AUDIT#${timestamp}#${id}`, id, entityType: 'audit_log', toolId: TOOL_ID, environment: APP_ENV, workspace_id: auth.workspaceId, action, table_name: entity, record_id: entityId, actor_id: auth.userId, actor_email: auth.email, old_data: before, new_data: after, created_at: timestamp, schemaVersion: SCHEMA_VERSION };
+  }
+
+  async requireRelationships(auth, entity, record) {
+    for (const [field, targetEntity] of Object.entries(entityRelationships[entity] || {})) {
+      const value = record[field];
+      if (value == null) continue;
+      const result = await this.client.send(new GetCommand({
+        TableName: this.tableName,
+        Key: { PK: tenantPk(auth.workspaceId), SK: entitySk(targetEntity, value) },
+        ConsistentRead: true
+      }));
+      if (!result.Item) throw Object.assign(new Error(`Referência inválida: ${field}.`), { statusCode: 400 });
+    }
   }
 }
 

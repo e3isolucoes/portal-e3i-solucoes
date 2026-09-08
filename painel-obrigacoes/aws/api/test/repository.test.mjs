@@ -18,6 +18,10 @@ function completion(id = 'completion-a', overrides = {}) {
   };
 }
 
+function obligation(id = 'obligation-a', workspaceKey = tenantKey) {
+  return { PK: workspaceKey, SK: `OBLIGATION#${id}`, id, entityType: 'obligations' };
+}
+
 function transactionalClient(items) {
   const state = new Map(items.map(item => [`${item.PK}|${item.SK}`, structuredClone(item)]));
   return {
@@ -83,7 +87,7 @@ test('listagem rejeita cursor adulterado', async () => {
 test('atualização de conclusão move o lock ao mudar a obrigação', async () => {
   const current = completion();
   const oldLock = { PK: tenantKey, SK: 'UNIQUE#COMPLETION#obligation-a#2026-09-01', completionId: current.id };
-  const client = transactionalClient([current, oldLock]);
+  const client = transactionalClient([current, oldLock, obligation('obligation-b')]);
 
   const updated = await new Repository(client, 'table').update(auth, 'completions', current.id, {
     version: 1,
@@ -98,7 +102,7 @@ test('atualização de conclusão move o lock ao mudar a obrigação', async () 
 test('atualização de conclusão move o lock ao mudar a ocorrência', async () => {
   const current = completion();
   const oldLock = { PK: tenantKey, SK: 'UNIQUE#COMPLETION#obligation-a#2026-09-01', completionId: current.id };
-  const client = transactionalClient([current, oldLock]);
+  const client = transactionalClient([current, oldLock, obligation()]);
 
   const updated = await new Repository(client, 'table').update(auth, 'completions', current.id, {
     version: 1,
@@ -114,7 +118,7 @@ test('atualização de conclusão responde 409 quando o novo lock pertence a out
   const current = completion();
   const oldLock = { PK: tenantKey, SK: 'UNIQUE#COMPLETION#obligation-a#2026-09-01', completionId: current.id };
   const conflictingLock = { PK: tenantKey, SK: 'UNIQUE#COMPLETION#obligation-b#2026-09-01', completionId: 'completion-b' };
-  const client = transactionalClient([current, oldLock, conflictingLock]);
+  const client = transactionalClient([current, oldLock, conflictingLock, obligation('obligation-b')]);
 
   await assert.rejects(
     new Repository(client, 'table').update(auth, 'completions', current.id, { version: 1, obligation_id: 'obligation-b' }),
@@ -127,7 +131,7 @@ test('atualização de conclusão responde 409 quando o novo lock pertence a out
 test('atualização faz rollback atômico quando o lock antigo não pertence à conclusão', async () => {
   const current = completion();
   const oldLock = { PK: tenantKey, SK: 'UNIQUE#COMPLETION#obligation-a#2026-09-01', completionId: 'completion-b' };
-  const client = transactionalClient([current, oldLock]);
+  const client = transactionalClient([current, oldLock, obligation()]);
 
   await assert.rejects(
     new Repository(client, 'table').update(auth, 'completions', current.id, { version: 1, occurrence_date: '2026-10-01' }),
@@ -137,4 +141,35 @@ test('atualização faz rollback atômico quando o lock antigo não pertence à 
   assert.equal(client.state.get(`${tenantKey}|${oldLock.SK}`).completionId, 'completion-b');
   assert.equal(client.state.has(`${tenantKey}|UNIQUE#COMPLETION#obligation-a#2026-10-01`), false);
   assert.equal([...client.state.values()].some(item => item.entityType === 'audit_log'), false);
+});
+
+test('criação de conclusão rejeita obrigação existente somente em outro tenant', async () => {
+  const otherTenant = 'TOOL#painel-obrigacoes#ENV#dev#WORKSPACE#empresa-b';
+  const client = transactionalClient([obligation('obligation-b', otherTenant)]);
+  await assert.rejects(
+    new Repository(client, 'table').create(auth, 'completions', {
+      obligation_id: 'obligation-b', occurrence_date: '2026-09-01', done_by_name: 'Usuário'
+    }),
+    error => error.statusCode === 400 && error.message === 'Referência inválida: obligation_id.'
+  );
+  assert.equal([...client.state.values()].some(item => item.entityType === 'completions'), false);
+});
+
+test('relações relevantes não aceitam referências entre tenants', async () => {
+  const otherTenant = 'TOOL#painel-obrigacoes#ENV#dev#WORKSPACE#empresa-b';
+  const cases = [
+    ['obligation_comments', { obligation_id: 'obligation-b', author_name: 'Usuário', body: 'Texto' }, 'obligation_id'],
+    ['checklist_items', { obligation_id: 'obligation-b', description: 'Passo' }, 'obligation_id'],
+    ['obligation_date_overrides', { obligation_id: 'obligation-b', original_date: '2026-09-01', override_date: '2026-09-02' }, 'obligation_id'],
+    ['companies', { name: 'Empresa', tax_regime_id: 'regime-b' }, 'tax_regime_id'],
+    ['tax_regime_rules', { tax_regime_id: 'regime-b', obligation_rule_id: 'rule-b' }, 'tax_regime_id']
+  ];
+  for (const [entity, payload, field] of cases) {
+    const client = transactionalClient([
+      obligation('obligation-b', otherTenant),
+      { PK: otherTenant, SK: 'TAX_REGIME#regime-b', id: 'regime-b' },
+      { PK: otherTenant, SK: 'RULE#rule-b', id: 'rule-b' }
+    ]);
+    await assert.rejects(new Repository(client, 'table').create(auth, entity, payload), error => error.statusCode === 400 && error.message === `Referência inválida: ${field}.`);
+  }
 });
