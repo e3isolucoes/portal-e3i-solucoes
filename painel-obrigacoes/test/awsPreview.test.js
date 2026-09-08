@@ -24,6 +24,14 @@ test('cliente AWS respeita o limite da API e repete respostas 429', async () => 
   assert.match(client, /response\.status\s*!==\s*429/);
 });
 
+test('falha em dados complementares não impede a abertura do painel AWS', async () => {
+  const data = await readFile(new URL('../js/data.js', import.meta.url), 'utf8');
+
+  assert.match(data, /const \[obligations, completions, companies\] = await Promise\.all/);
+  assert.match(data, /optionalLoads = await Promise\.allSettled/);
+  assert.match(data, /Lista de espaços indisponível/);
+});
+
 test('conclusões criadas na AWS recebem data de conclusão compatível com o painel', async () => {
   const repository = await readFile(new URL('../aws/api/src/repository.mjs', import.meta.url), 'utf8');
   assert.match(repository, /entity === 'completions'/);
