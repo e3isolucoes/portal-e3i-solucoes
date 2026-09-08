@@ -89,13 +89,13 @@ test('entrada da aplicação invalida módulos anteriores à tela de super admin
     readFile(new URL('../js/app.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
   ]);
-  const appVersion = 'v=20260903-sso-modular-v1';
-  const moduleVersion = 'v=20260903-sso-modular-v1';
-  assert.match(index, /js\/runtime-config\.js\?v=20260903-sso-modular-v1/);
+  const appVersion = 'v=20260908-csp-wasm-v2';
+  const moduleVersion = 'v=20260908-csp-wasm-v2';
+  assert.match(index, /js\/runtime-config\.js\?v=20260908-csp-wasm-v2/);
   assert.match(index, new RegExp(`js/app\\.js\\?${appVersion}`));
   assert.match(app, new RegExp(`data\\.js\\?${moduleVersion}`));
   assert.match(app, new RegExp(`render\\.js\\?${moduleVersion}`));
-  assert.match(render, /data\.js\?v=20260830-modular-v1/);
+  assert.match(render, /data\.js\?v=20260908-csp-wasm-v2/);
 });
 
 test('troca de papel espera a seleção efetiva em vez de reagir ao click que abre o combo', async () => {

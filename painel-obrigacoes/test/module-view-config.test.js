@@ -21,7 +21,7 @@ test('CSP continua estrita e dependências opcionais não são carregadas no boo
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
   ]);
   const csp = JSON.parse(configText).globalHeaders['Content-Security-Policy'];
-  assert.doesNotMatch(csp, /'wasm-unsafe-eval'/);
+  assert.match(csp, /'wasm-unsafe-eval'/);
   assert.doesNotMatch(csp, /(?:^|\s)'unsafe-eval'(?:\s|;|$)/);
   assert.doesNotMatch(index, /pdfjs-dist@3\.11\.174/);
   assert.doesNotMatch(index, /xlsx\.full\.min\.js/);
