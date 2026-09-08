@@ -30,3 +30,10 @@ test('entidades declaram a fronteira modular aplicada pelo backend', () => {
   assert.equal(entityConfig('obligations').grant, 'obrigacoes');
   assert.equal(entityConfig('audit_log').grant, 'administracao');
 });
+
+test('dados necessários ao painel usam leitura operacional e escrita administrativa', () => {
+  for (const entity of ['profiles', 'holidays', 'obligation_rules', 'tax_regimes', 'tax_regime_rules', 'categories']) {
+    assert.equal(entityConfig(entity).grant, 'obrigacoes');
+    assert.equal(entityConfig(entity).writeGrant, 'administracao');
+  }
+});

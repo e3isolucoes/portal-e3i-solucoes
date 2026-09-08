@@ -38,7 +38,6 @@ import { showToast } from './ui/toast.js';
 import { confirmDialog } from './ui/confirmDialog.js';
 import { findClosestProfile } from './csv.js';
 import { fetchCategories } from './api/categories.js';
-import { countPendingValidations, countRejected } from './api/validation.js';
 import { applyCategories } from './constants.js';
 import { fetchWorkspaces, createWorkspace, updateWorkspace } from './api/workspaces.js';
 import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v=20260814-sankhya-checklists-v1';
@@ -49,13 +48,15 @@ import { getSankhyaChecklistTemplate } from './obligationChecklistTemplates.js?v
 export async function loadAll() {
   STATE.connectionError = null;
   try {
-    const [
-      obligations, completions, companies, profiles, holidays, obligationRules, occurrenceOverrides,
-      taxRegimes, taxRegimeRules, checklistItems, categories, pendingValidation, rejectedValidation,
-    ] = await Promise.all([
+    // Somente os três conjuntos que formam o quadro são críticos. Dados de
+    // apoio podem estar indisponíveis por uma concessão de módulo mais
+    // restrita ou durante uma atualização gradual da API sem derrubar o painel.
+    const [obligations, completions, companies] = await Promise.all([
       fetchObligations(),
       fetchCompletions(),
       fetchCompanies(),
+    ]);
+    const optionalLoads = await Promise.allSettled([
       fetchProfiles(),
       fetchHolidays(),
       fetchObligationRules(),
@@ -64,9 +65,21 @@ export async function loadAll() {
       fetchTaxRegimeRules(),
       fetchAllChecklistItems(),
       fetchCategories(),
-      countPendingValidations(),
-      countRejected(),
     ]);
+    const optionalValue = (index, fallback) => {
+      const result = optionalLoads[index];
+      if (result.status === 'fulfilled') return result.value;
+      console.warn('Dado complementar do painel indisponível', result.reason);
+      return fallback;
+    };
+    const profiles = optionalValue(0, STATE.profile ? [STATE.profile] : []);
+    const holidays = optionalValue(1, []);
+    const obligationRules = optionalValue(2, []);
+    const occurrenceOverrides = optionalValue(3, []);
+    const taxRegimes = optionalValue(4, []);
+    const taxRegimeRules = optionalValue(5, []);
+    const checklistItems = optionalValue(6, []);
+    const categories = optionalValue(7, []);
     STATE.obligations = obligations;
     STATE.completions = completions;
     STATE.companies = companies;
@@ -78,8 +91,17 @@ export async function loadAll() {
     STATE.taxRegimeRules = taxRegimeRules;
     STATE.checklistItems = checklistItems;
     applyCategories(categories);
-    STATE.validation = { pending: pendingValidation, rejected: rejectedValidation };
-    STATE.workspaces = isSuperUser() ? await fetchWorkspaces() : [];
+    STATE.validation = {
+      pending: completions.filter((item) => item.status === 'aguardando_validacao').length,
+      rejected: completions.filter((item) => item.status === 'rejeitada' && item.done_by === STATE.session?.id).length,
+    };
+    if (isSuperUser()) {
+      try { STATE.workspaces = await fetchWorkspaces(); }
+      catch (error) {
+        console.warn('Lista de espaços indisponível', error);
+        STATE.workspaces = [];
+      }
+    } else STATE.workspaces = [];
   } catch (err) {
     console.error('Falha ao carregar dados do painel', err);
     STATE.connectionError = 'Não foi possível carregar os dados agora. Verifique sua conexão com a internet.';

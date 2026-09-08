@@ -37,7 +37,7 @@ export class Repository {
 
   async create(auth, entity, input) {
     const config = entityConfig(entity);
-    requireModuleGrant(auth, config.grant);
+    requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
     const id = input.id || randomUUID();
     const timestamp = now();
@@ -65,7 +65,7 @@ export class Repository {
 
   async update(auth, entity, id, patch) {
     const config = entityConfig(entity);
-    requireModuleGrant(auth, config.grant);
+    requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
     const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, patch) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;
@@ -90,7 +90,7 @@ export class Repository {
 
   async remove(auth, entity, id) {
     const config = entityConfig(entity);
-    requireModuleGrant(auth, config.grant);
+    requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
     const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;

@@ -10,4 +10,3 @@ aws-cli-install.log
 .migration/
 .tools/
 .DS_Store
-js/config.js
