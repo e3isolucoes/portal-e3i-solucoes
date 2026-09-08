@@ -182,6 +182,8 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expiresAt
         Enabled: true
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
       Tags:
         - { Key: e3i:tool, Value: !Ref ToolId }
         - { Key: e3i:environment, Value: !Ref Environment }
@@ -235,6 +237,133 @@ Resources:
             ApiId: !Ref ServerlessHttpApi
             Path: /{proxy+}
             Method: ANY
+
+  DeletionDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub e3i-${Environment}-${ToolId}-deletions-dlq
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  DeletionQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub e3i-${Environment}-${ToolId}-deletions
+      VisibilityTimeout: 90
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeletionDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  DeletionPipeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: pipes.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: stream-to-deletion-queue
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:DescribeStream, dynamodb:GetRecords, dynamodb:GetShardIterator, dynamodb:ListStreams]
+                Resource: !GetAtt DataTable.StreamArn
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: [!GetAtt DeletionQueue.Arn, !GetAtt DeletionDeadLetterQueue.Arn]
+
+  DeletionOutboxPipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Name: !Sub e3i-${Environment}-${ToolId}-deletion-outbox
+      RoleArn: !GetAtt DeletionPipeRole.Arn
+      Source: !GetAtt DataTable.StreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+          BatchSize: 10
+          MaximumRetryAttempts: 5
+          DeadLetterConfig: { Arn: !GetAtt DeletionDeadLetterQueue.Arn }
+        FilterCriteria:
+          Filters:
+            - Pattern: '{"eventName":["INSERT"],"dynamodb":{"NewImage":{"entityType":{"S":["file_deletion_outbox"]}}}}'
+      Target: !GetAtt DeletionQueue.Arn
+      TargetParameters:
+        SqsQueueParameters: {}
+        InputTemplate: '<$.dynamodb.NewImage>'
+
+  DeletionWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: api/dist/
+      Handler: deletion-handler.worker
+      FunctionName: !Sub e3i-${Environment}-${ToolId}-deletion-worker
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref DataTable }
+        - S3CrudPolicy: { BucketName: !Ref FilesBucket }
+      Events:
+        Deletions:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DeletionQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes: [ReportBatchItemFailures]
+
+  DeletionReconciliationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: api/dist/
+      Handler: deletion-handler.reconcile
+      FunctionName: !Sub e3i-${Environment}-${ToolId}-deletion-reconciliation
+      Timeout: 300
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref DataTable }
+        - S3CrudPolicy: { BucketName: !Ref FilesBucket }
+      Events:
+        Daily:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 day)
+            State: ENABLED
+
+  DeletionDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub e3i-${Environment}-${ToolId}-deletion-dead-letter
+      AlarmDescription: Exclusões que esgotaram todas as tentativas
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeletionDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  DeletionFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub e3i-${Environment}-${ToolId}-deletion-attempt-failures
+      Namespace: E3I/Deletion
+      MetricName: DeletionAttemptFailed
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 3
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
 
   NotificationEmailIdentity:
     Type: AWS::SES::EmailIdentity

@@ -3,7 +3,7 @@ import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { S3Client } from '@aws-sdk/client-s3';
 import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider';
 import { authenticate } from './auth.mjs';
-import { createDownloadUrl, createUploadUrl, deleteStoredFile } from './files.mjs';
+import { createDownloadUrl, createUploadUrl } from './files.mjs';
 import { claimPortalProvisioningNonce, provisionPortalAccess, verifyPortalProvisioning } from './portal-provisioning.mjs';
 import { consumePortalSession, createPortalSession } from './portal-session.mjs';
 import { createPasswordSession, issueBrowserSession, readRefreshCookie, refreshCookie, revokeBrowserSession, rotateBrowserSession } from './browser-session.mjs';
@@ -83,10 +83,8 @@ export async function handler(event) {
     if (method === 'POST' && !id) return response(201, await repository.create(auth, entity, parseBody(event)), event);
     if (method === 'PATCH' && id) return response(200, await repository.update(auth, entity, id, parseBody(event)), event);
     if (method === 'DELETE' && id) {
-      const current = entity === 'completions' ? await repository.get(auth, entity, id) : null;
-      if (current?.attachment_path) await deleteStoredFile(s3, process.env.FILES_BUCKET, auth, current.attachment_path);
-      await repository.remove(auth, entity, id);
-      return response(204, {}, event);
+      const deletion = await repository.remove(auth, entity, id);
+      return response(deletion ? 202 : 204, deletion || {}, event);
     }
     return response(404, { error: 'Rota não encontrada.', requestId }, event);
   } catch (error) {
