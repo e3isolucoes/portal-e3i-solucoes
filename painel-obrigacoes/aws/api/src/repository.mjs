@@ -33,7 +33,10 @@ export class Repository {
     requireModuleGrant(auth, config.grant);
     requireRole(auth, config.read);
     const result = await this.client.send(new GetCommand({ TableName: this.tableName, Key: { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id) } }));
-    return result.Item?.deletion_pending ? null : publicRecord(result.Item);
+    if (!result.Item || result.Item.deletion_pending) {
+      throw Object.assign(new Error('Registro não encontrado.'), { statusCode: 404 });
+    }
+    return publicRecord(result.Item);
   }
 
   async create(auth, entity, input) {
@@ -122,6 +125,8 @@ export class Repository {
     requireRole(auth, config.write);
     const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;
+    // DELETE is idempotent: an already absent record is a successful no-op. The
+    // HTTP adapter represents this null result as 204 No Content.
     if (!current) return null;
     if (current.deletion_pending && current.deletion_event_id) return { eventId: current.deletion_event_id };
     const timestamp = now(); const eventId = randomUUID();

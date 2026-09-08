@@ -73,17 +73,31 @@ export async function handler(event) {
     }
 
     const auth = await authenticate(event, ddb, process.env.TABLE_NAME);
+    return handleAuthenticatedRequest(event, auth, { method, path, requestId });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    console.error(JSON.stringify({ level: 'error', requestId, status, name: error.name, message: status < 500 ? error.message : 'internal_error' }));
+    return response(status, { error: status < 500 ? error.message : 'Erro interno.', requestId }, event);
+  }
+}
+
+export async function handleAuthenticatedRequest(event, auth, request = {}) {
+  const method = request.method || event.requestContext?.http?.method || event.httpMethod;
+  const path = request.path ?? (event.rawPath || event.path || '/').replace(/^\/v1\/?/, '');
+  const requestId = request.requestId ?? event.requestContext?.requestId;
+  const dataRepository = request.repository || repository;
+  try {
     if (method === 'GET' && path === 'me') return response(200, { userId: auth.userId, email: auth.email, workspaceId: auth.workspaceId, role: auth.role, moduleGrants: auth.moduleGrants }, event);
     if (path === 'files/upload-url' && method === 'POST') return response(200, await createUploadUrl(s3, process.env.FILES_BUCKET, auth, parseBody(event)), event);
     if (path === 'files/download-url' && method === 'POST') return response(200, await createDownloadUrl(s3, process.env.FILES_BUCKET, auth, parseBody(event).path), event);
 
     const [entity, id] = path.split('/').map(decodeURIComponent);
-    if (method === 'GET' && !id) return response(200, await repository.list(auth, entity, listOptions(event)), event);
-    if (method === 'GET' && id) return response(200, await repository.get(auth, entity, id), event);
-    if (method === 'POST' && !id) return response(201, await repository.create(auth, entity, parseBody(event)), event);
-    if (method === 'PATCH' && id) return response(200, await repository.update(auth, entity, id, parseBody(event)), event);
+    if (method === 'GET' && !id) return response(200, await dataRepository.list(auth, entity, listOptions(event)), event);
+    if (method === 'GET' && id) return response(200, await dataRepository.get(auth, entity, id), event);
+    if (method === 'POST' && !id) return response(201, await dataRepository.create(auth, entity, parseBody(event)), event);
+    if (method === 'PATCH' && id) return response(200, await dataRepository.update(auth, entity, id, parseBody(event)), event);
     if (method === 'DELETE' && id) {
-      const deletion = await repository.remove(auth, entity, id);
+      const deletion = await dataRepository.remove(auth, entity, id);
       return response(deletion ? 202 : 204, deletion || {}, event);
     }
     return response(404, { error: 'Rota não encontrada.', requestId }, event);
