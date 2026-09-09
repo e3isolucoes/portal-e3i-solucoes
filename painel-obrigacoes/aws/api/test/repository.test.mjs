@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Repository } from '../src/repository.mjs';
+import { frontendPayloads } from './fixtures/frontend-payloads.mjs';
 
 const auth = { workspaceId: 'empresa-a', userId: 'user-a', role: 'member', email: 'user@empresa.test' };
 const tenantKey = 'TOOL#painel-obrigacoes#ENV#dev#WORKSPACE#empresa-a';
@@ -180,6 +181,53 @@ test('relações relevantes não aceitam referências entre tenants', async () =
     ]);
     await assert.rejects(new Repository(client, 'table').create(adminAuth, entity, payload), error => error.statusCode === 400 && error.message === `Referência inválida: ${field}.`);
   }
+});
+
+test('admin não pode escalar perfil para super_admin', async () => {
+  const profile = { PK: tenantKey, SK: 'PROFILE#user-b', id: 'user-b', role: 'member', version: 1, entityType: 'profiles' };
+  const client = transactionalClient([profile]);
+  await assert.rejects(
+    new Repository(client, 'table').update({ ...auth, role: 'admin' }, 'profiles', 'user-b', { role: 'super_admin', version: 1 }),
+    error => error.statusCode === 403
+  );
+  assert.equal(client.state.get(`${tenantKey}|${profile.SK}`).role, 'member');
+});
+
+test('membro não pode adulterar o validador antes de aprovar', async () => {
+  const current = completion('completion-pending', { status: 'aguardando_validacao', validator_id: 'validator-a' });
+  const client = transactionalClient([current]);
+  await assert.rejects(
+    new Repository(client, 'table').update(auth, 'completions', current.id, { validator_id: auth.userId, version: 1 }),
+    error => error.statusCode === 403 && /controlado pelo servidor/.test(error.message)
+  );
+  assert.equal(client.state.get(`${tenantKey}|${current.SK}`).validator_id, 'validator-a');
+});
+
+test('update exige a versão observada pelo cliente', async () => {
+  const current = completion();
+  const client = transactionalClient([current]);
+  await assert.rejects(
+    new Repository(client, 'table').update(auth, 'completions', current.id, { attachment_path: 'file.pdf' }),
+    error => error.statusCode === 400 && /version/.test(error.message)
+  );
+});
+
+test('registro legado rejeitado pode ser reenviado pelo executor', () => {
+  const repository = new Repository({}, 'table');
+  const patch = repository.completionTransition(auth, completion('legacy', { status: 'rejeitado', done_by: auth.userId }), {
+    status: 'aguardando_validacao', version: 1
+  });
+  assert.equal(patch.status, 'aguardando_validacao');
+  assert.equal(patch.rejection_reason, null);
+  assert.equal(patch.validated_at, null);
+});
+
+test('conclusão não pode ser criada em nome de outro usuário', async () => {
+  const client = transactionalClient([obligation()]);
+  await assert.rejects(
+    new Repository(client, 'table').create(auth, 'completions', { ...frontendPayloads.completion, done_by: 'user-b' }),
+    error => error.statusCode === 403
+  );
 });
 
 test('exclusão grava estado pendente e outbox atomicamente antes de qualquer efeito externo', async () => {

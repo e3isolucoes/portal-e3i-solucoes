@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { membershipPk } from './model.mjs';
+import { canonicalRole } from './contract.mjs';
 
 const jwksByIssuer = new Map();
 
@@ -66,7 +67,7 @@ export async function authenticate(event, documentClient, tableName) {
     userId,
     email: payload.email,
     workspaceId: membership.workspaceId,
-    role: membership.role || 'member',
+    role: canonicalRole(membership.role) || 'member',
     moduleGrants: Array.isArray(membership.module_grants) ? membership.module_grants : null,
     issuer,
     tokenId: payload.jti || null,

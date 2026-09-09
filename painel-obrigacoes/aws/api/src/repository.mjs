@@ -3,6 +3,7 @@ import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dyn
 import { entityConfig, entitySk, publicRecord, SCHEMA_VERSION, tenantPk, TOOL_ID, APP_ENV } from './model.mjs';
 import { requireModuleGrant, requireRole } from './auth.mjs';
 import { entityRelationships, validateCreate, validateUpdate } from './validators.mjs';
+import { canonicalCompletionStatus } from './contract.mjs';
 
 const now = () => new Date().toISOString();
 
@@ -41,11 +42,16 @@ export class Repository {
     requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
     const validated = validateCreate(entity, input);
+    this.requireSafeProfileRoleChange(auth, null, validated, true);
+    if (entity === 'completions' && validated.done_by && validated.done_by !== auth.userId) {
+      throw Object.assign(new Error('Não é permitido concluir em nome de outro usuário.'), { statusCode: 403 });
+    }
+    if (entity === 'completions') this.rejectClientManagedCompletionMetadata(validated, true);
     await this.requireRelationships(auth, entity, validated);
     const id = validated.id || randomUUID();
     const timestamp = now();
     const entityDefaults = entity === 'completions'
-      ? { done_at: validated.done_at || timestamp }
+      ? await this.completionCreateDefaults(auth, validated, timestamp)
       : {};
     const record = { ...validated, ...entityDefaults, id, version: 1, toolId: TOOL_ID, environment: APP_ENV, workspace_id: auth.workspaceId, entityType: entity, schemaVersion: SCHEMA_VERSION, created_at: timestamp, updated_at: timestamp };
     const item = { ...record, PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, record) };
@@ -71,14 +77,18 @@ export class Repository {
     requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
     const safePatch = validateUpdate(entity, patch);
+    if (safePatch.version === undefined) throw Object.assign(new Error('Campo obrigatório: version.'), { statusCode: 400 });
     const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, safePatch) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;
     if (!current) throw Object.assign(new Error('Registro não encontrado.'), { statusCode: 404 });
     if (current.deletion_pending) throw Object.assign(new Error('Registro com exclusão pendente.'), { statusCode: 409 });
-    await this.requireRelationships(auth, entity, { ...publicRecord(current), ...safePatch });
+    this.requireSafeProfileRoleChange(auth, current, safePatch, false);
+    if (entity === 'completions') this.rejectClientManagedCompletionMetadata(safePatch, false, current);
+    const lifecyclePatch = entity === 'completions' ? this.completionTransition(auth, current, safePatch) : safePatch;
+    await this.requireRelationships(auth, entity, { ...publicRecord(current), ...lifecyclePatch });
     const expectedVersion = Number(safePatch.version ?? current.version ?? 1);
     if (expectedVersion !== Number(current.version ?? 1)) throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
-    const item = { ...current, ...safePatch, version: expectedVersion + 1, updated_at: now() };
+    const item = { ...current, ...lifecyclePatch, version: expectedVersion + 1, updated_at: now() };
     const occurrenceChanged = entity === 'completions'
       && (item.obligation_id !== current.obligation_id || item.occurrence_date !== current.occurrence_date);
     const lockChanges = occurrenceChanged
@@ -151,6 +161,56 @@ export class Repository {
       }));
       if (!result.Item) throw Object.assign(new Error(`Referência inválida: ${field}.`), { statusCode: 400 });
     }
+  }
+
+  requireSafeProfileRoleChange(auth, current, patch, creating) {
+    if (patch.role === undefined) return;
+    if (patch.role === 'super_admin' || current?.role === 'super_admin') {
+      if (auth.role !== 'super_admin') throw Object.assign(new Error('Somente super_admin pode conceder ou alterar este papel.'), { statusCode: 403 });
+    }
+    if (!creating && current?.id === auth.userId && patch.role !== current.role) {
+      throw Object.assign(new Error('Não é permitido alterar o próprio papel.'), { statusCode: 403 });
+    }
+  }
+
+  async completionCreateDefaults(auth, validated, timestamp) {
+    const obligation = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: { PK: tenantPk(auth.workspaceId), SK: entitySk('obligations', validated.obligation_id) }, ConsistentRead: true }))).Item;
+    if (!obligation) throw Object.assign(new Error('Referência inválida: obligation_id.'), { statusCode: 400 });
+    const requiresValidation = obligation.requires_validation !== false && !['admin', 'super_admin'].includes(auth.role);
+    if (requiresValidation && !obligation.validator_id) throw Object.assign(new Error('A Gestão ainda não definiu o validador desta tarefa.'), { statusCode: 400 });
+    if (requiresValidation && obligation.validator_id === auth.userId) throw Object.assign(new Error('O executor não pode validar o próprio trabalho.'), { statusCode: 400 });
+    return {
+      done_at: validated.done_at || timestamp, done_by: auth.userId,
+      status: requiresValidation ? 'aguardando_validacao' : 'validada',
+      validator_id: obligation.validator_id || null, submitted_at: validated.submitted_at || timestamp,
+      ...(requiresValidation ? {} : { validated_at: timestamp, validated_by: auth.userId })
+    };
+  }
+
+  completionTransition(auth, current, patch) {
+    const currentStatus = canonicalCompletionStatus(current.status) || current.status;
+    if (patch.status === undefined || patch.status === currentStatus) return patch;
+    const timestamp = now();
+    if (currentStatus === 'aguardando_validacao' && ['validada', 'rejeitada'].includes(patch.status)) {
+      if (current.validator_id !== auth.userId) throw Object.assign(new Error('Somente o validador designado pode validar.'), { statusCode: 403 });
+      return { ...patch, validator_id: current.validator_id, validated_by: auth.userId, validated_at: timestamp,
+        ...(patch.status === 'validada' ? { rejection_reason: null, rejected_at: null } : { rejected_at: timestamp }) };
+    }
+    if (currentStatus === 'rejeitada' && patch.status === 'aguardando_validacao') {
+      if (current.done_by !== auth.userId) throw Object.assign(new Error('Somente o executor pode reenviar para validação.'), { statusCode: 403 });
+      return { ...patch, rejection_reason: null, rejected_at: null, validated_at: null, validated_by: null, submitted_at: timestamp };
+    }
+    throw Object.assign(new Error('Transição de estado inválida.'), { statusCode: 409 });
+  }
+
+  rejectClientManagedCompletionMetadata(patch, creating, current = null) {
+    const serverFields = ['done_at', 'validator_id', 'submitted_at', 'validated_at', 'validated_by', 'rejected_at'];
+    if (creating) serverFields.push('status', 'rejection_reason');
+    const statusChanges = !creating && patch.status !== undefined
+      && patch.status !== (canonicalCompletionStatus(current?.status) || current?.status);
+    const forbidden = serverFields.filter(field => patch[field] !== undefined && (!statusChanges || field === 'done_at'));
+    if (!creating && patch.done_by !== undefined) forbidden.push('done_by');
+    if (forbidden.length) throw Object.assign(new Error(`Campo controlado pelo servidor: ${forbidden[0]}.`), { statusCode: 403 });
   }
 }
 
