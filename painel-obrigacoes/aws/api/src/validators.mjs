@@ -1,3 +1,5 @@
+import { CANONICAL_COMPLETION_STATUSES, CANONICAL_ROLES, canonicalCompletionStatus, canonicalRole } from './contract.mjs';
+
 const IDENTIFIER = /^[a-zA-Z0-9_.:@+-]{1,200}$/;
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -14,7 +16,7 @@ const strings = (options = {}) => ({ type: 'array', max: 100, item: text(500), .
 
 const schemas = Object.freeze({
   profiles: {
-    fields: { id: id(), email: text(254, { format: 'email' }), display_name: text(160), role: enumeration(['member', 'manager', 'admin', 'super_admin']), active: boolean(), module_access: strings() },
+    fields: { id: id(), email: text(254, { format: 'email' }), display_name: text(160), role: enumeration(CANONICAL_ROLES, { adapter: canonicalRole }), active: boolean(), module_access: strings() },
     required: ['email', 'display_name', 'role']
   },
   companies: {
@@ -25,7 +27,7 @@ const schemas = Object.freeze({
       id: id(), name: text(300), category: text(100), company_id: id({ nullable: true }), responsible: text(200), responsible_id: id({ nullable: true }),
       frequency: enumeration(['diaria', 'mensal', 'trimestral', 'anual', 'pontual']), day_of_month: integer(1, 31, { nullable: true }), month: integer(1, 12, { nullable: true }), months: ids({ nullable: true }),
       due_date: date({ nullable: true }), notes: text(10_000), activity_type: enumeration(['obrigacao_acessoria', 'rotina', 'tarefa', 'marco']), process_name: text(300), area_name: text(200),
-      predecessor_id: id({ nullable: true }), requires_attachment: boolean(), requires_attachment_no_movement: boolean(), priority: enumeration(['baixa', 'media', 'alta', 'critica']),
+      predecessor_id: id({ nullable: true }), module_key: id(), requires_attachment: boolean(), requires_attachment_no_movement: boolean(), priority: enumeration(['baixa', 'media', 'alta', 'critica']),
       adjust_business_day: boolean(), day_type: enumeration(['fixo', 'util_do_mes']), business_day_shift: enumeration(['nenhum', 'proximo_util', 'anterior_util']), requires_validation: boolean(), validator_id: id({ nullable: true })
     },
     required: ['name', 'category', 'frequency']
@@ -34,8 +36,8 @@ const schemas = Object.freeze({
     fields: {
       id: id(), obligation_id: id(), occurrence_date: date(), done_by: id({ nullable: true }), done_by_name: text(200), done_at: timestamp(), movement_status: enumeration(['nao_informado', 'com_movimento', 'sem_movimento']),
       attachment_path: text(1024, { nullable: true }), checklist_total: integer(0, 10_000, { nullable: true }), checklist_checked: integer(0, 10_000, { nullable: true }),
-      ocr_status: enumeration(['ok', 'mismatch', 'not_checked'], { nullable: true }), ocr_extracted_period: text(40, { nullable: true }), status: enumeration(['aguardando_validacao', 'validado', 'rejeitado']),
-      validator_id: id({ nullable: true }), submitted_at: timestamp(), validated_at: timestamp({ nullable: true }), validated_by: id({ nullable: true }), rejection_reason: text(2_000, { nullable: true })
+      ocr_status: enumeration(['ok', 'mismatch', 'not_checked'], { nullable: true }), ocr_extracted_period: text(40, { nullable: true }), status: enumeration(CANONICAL_COMPLETION_STATUSES, { adapter: canonicalCompletionStatus }),
+      validator_id: id({ nullable: true }), submitted_at: timestamp(), validated_at: timestamp({ nullable: true }), rejected_at: timestamp({ nullable: true }), validated_by: id({ nullable: true }), rejection_reason: text(2_000, { nullable: true })
     }, required: ['obligation_id', 'occurrence_date', 'done_by_name']
   },
   obligation_comments: { fields: { id: id(), obligation_id: id(), author_id: id({ nullable: true }), author_name: text(200), body: text(10_000) }, required: ['obligation_id', 'author_name', 'body'] },
@@ -49,7 +51,7 @@ const schemas = Object.freeze({
   tax_regimes: { fields: { id: id(), name: text(200), description: text(5_000) }, required: ['name'] },
   tax_regime_rules: { fields: { id: id(), tax_regime_id: id(), obligation_rule_id: id() }, required: ['tax_regime_id', 'obligation_rule_id'] },
   categories: { fields: { id: id(), name: text(100), descricao: text(2_000, { nullable: true }), cor: text(7, { format: 'color' }), ordem: integer(0, 100_000), ativo: boolean(), sistema: boolean(), exige_validacao: boolean(), validador_padrao_id: id({ nullable: true }) }, required: ['name'] },
-  workspaces: { fields: { id: id(), name: text(200), document: text(14), access_status: enumeration(['full', 'restricted', 'suspended']) }, required: ['name'] }
+  workspaces: { fields: { id: id(), name: text(200), document: text(14, { nullable: true }), access_status: enumeration(['trial', 'full', 'suspended']), trial_ends_at: date({ nullable: true }) }, required: ['name'] }
 });
 
 export function validateCreate(entity, input) { return validate(entity, input, true); }
@@ -84,14 +86,15 @@ function validateValue(name, value, rule) {
   if (rule.type === 'string') {
     if (typeof value !== 'string') invalid(`Campo inválido: ${name}.`);
     const normalized = value.trim();
-    if (rule.enum && !rule.enum.includes(normalized)) invalid(`Valor não permitido: ${name}.`);
+    const adapted = rule.adapter ? rule.adapter(normalized) : normalized;
+    if (rule.enum && !rule.enum.includes(adapted)) invalid(`Valor não permitido: ${name}.`);
     if (normalized.length > rule.max) invalid(`Campo excede o tamanho máximo: ${name}.`);
     if (rule.format === 'identifier' && !IDENTIFIER.test(normalized)) invalid(`Identificador inválido: ${name}.`);
     if (rule.format === 'date' && !validDate(normalized)) invalid(`Data inválida: ${name}.`);
     if (rule.format === 'timestamp' && (!TIMESTAMP.test(normalized) || Number.isNaN(Date.parse(normalized)))) invalid(`Data e hora inválida: ${name}.`);
     if (rule.format === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) invalid(`Formato inválido: ${name}.`);
     if (rule.format === 'color' && !/^#[0-9a-fA-F]{6}$/.test(normalized)) invalid(`Formato inválido: ${name}.`);
-    return normalized;
+    return adapted;
   }
   if (rule.type === 'boolean') {
     if (typeof value !== 'boolean') invalid(`Campo inválido: ${name}.`);
@@ -120,6 +123,8 @@ function validateEntity(entity, value, creating) {
     if (entity === 'obligations' && value.frequency === 'pontual' && !value.due_date) invalid('Campo obrigatório para a frequência pontual: due_date.');
   }
   if (entity === 'completions' && value.checklist_total != null && value.checklist_checked != null && value.checklist_checked > value.checklist_total) invalid('Checklist inválido.');
+  if (entity === 'completions' && value.status === 'rejeitada' && !value.rejection_reason?.trim()) invalid('Motivo obrigatório para uma rejeição.');
+  if (entity === 'workspaces' && value.access_status === 'trial' && !value.trial_ends_at) invalid('Campo obrigatório para acesso trial: trial_ends_at.');
 }
 
 export const entityRelationships = Object.freeze({
