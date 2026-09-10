@@ -116,8 +116,18 @@ export async function handleAuthenticatedRequest(event, auth, dependencies) {
   }
 }
 
-function errorResponse(error, event, requestId) {
-  const status = error.statusCode || 500;
-  console.error(JSON.stringify({ level: 'error', requestId, status, name: error.name, message: status < 500 ? error.message : 'internal_error' }));
-  return response(status, { error: status < 500 ? error.message : 'Erro interno.', requestId }, event);
+export function errorResponse(error, event, requestId) {
+  const upstreamRequestId = error?.$metadata?.requestId;
+  const status = error.statusCode || (upstreamRequestId ? 502 : 500);
+  const method = event.requestContext?.http?.method || event.httpMethod;
+  const path = event.rawPath || event.path || '/';
+  const code = status === 502 ? 'UPSTREAM_SERVICE_ERROR' : status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_REJECTED';
+  console.error(JSON.stringify({
+    level: 'error', requestId, method, path, status, code,
+    name: error.name,
+    upstreamRequestId,
+    upstreamStatus: error?.$metadata?.httpStatusCode,
+    message: status < 500 ? error.message : 'internal_error',
+  }));
+  return response(status, { error: status < 500 ? error.message : 'Erro interno.', code, requestId }, event);
 }

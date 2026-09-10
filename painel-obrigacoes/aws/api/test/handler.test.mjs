@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { handleAuthenticatedRequest } from '../src/handler.mjs';
+import { errorResponse, handleAuthenticatedRequest } from '../src/handler.mjs';
 
 const auth = { workspaceId: 'empresa-a', userId: 'user-a', role: 'member', email: 'user@empresa.test' };
 
@@ -23,7 +23,34 @@ test('GET inexistente preserva o erro 404 do repositório', async () => {
   const result = await handleAuthenticatedRequest(event('GET', 'obligations/missing'), auth, { repository });
 
   assert.equal(result.statusCode, 404);
-  assert.deepEqual(JSON.parse(result.body), { error: 'Registro não encontrado.', requestId: 'request-a' });
+  assert.deepEqual(JSON.parse(result.body), { error: 'Registro não encontrado.', code: 'REQUEST_REJECTED', requestId: 'request-a' });
+});
+
+test('falha de serviço AWS retorna JSON 502 rastreável sem expor detalhes internos', () => {
+  const originalConsoleError = console.error;
+  const logs = [];
+  console.error = value => logs.push(JSON.parse(value));
+  try {
+    const error = Object.assign(new Error('mensagem sensível do provedor'), {
+      name: 'ServiceUnavailableException',
+      $metadata: { requestId: 'aws-request-1', httpStatusCode: 503 },
+    });
+
+    const result = errorResponse(error, event('POST', 'internal/portal-access'), 'request-a');
+
+    assert.equal(result.statusCode, 502);
+    assert.match(result.headers['content-type'], /application\/json/);
+    assert.deepEqual(JSON.parse(result.body), {
+      error: 'Erro interno.', code: 'UPSTREAM_SERVICE_ERROR', requestId: 'request-a',
+    });
+    assert.deepEqual(logs, [{
+      level: 'error', requestId: 'request-a', method: 'POST', path: '/v1/internal/portal-access',
+      status: 502, code: 'UPSTREAM_SERVICE_ERROR', name: 'ServiceUnavailableException',
+      upstreamRequestId: 'aws-request-1', upstreamStatus: 503, message: 'internal_error',
+    }]);
+  } finally {
+    console.error = originalConsoleError;
+  }
 });
 
 test('DELETE inexistente responde 204 conforme contrato idempotente', async () => {
