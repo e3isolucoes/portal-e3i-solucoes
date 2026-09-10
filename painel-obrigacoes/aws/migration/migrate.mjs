@@ -1,4 +1,4 @@
-import { batchPut, documentClient, enrichRows, entities, fetchAll, membershipItem, requiredEnv, toItem } from './shared.mjs';
+import { administrationPk, batchPut, documentClient, enrichRows, entities, fetchAll, membershipItem, requiredEnv, toItem } from './shared.mjs';
 
 const execute = process.argv.includes('--execute');
 const config = requiredEnv();
@@ -41,6 +41,9 @@ for (const entity of Object.keys(entities)) {
   }
   if (entity === 'profiles') {
     for (const row of rows.filter((profile) => profile.workspace_id)) valid.push(membershipItem(config, row));
+  }
+  if (entity === 'workspaces') {
+    for (const row of rows) valid.push({ ...toItem(config, entity, row), PK: administrationPk(config), SK: `WORKSPACE#${row.id}`, version: row.version || 1, scope: 'administration' });
   }
   if (execute && valid.length) await batchPut(client, config.table, valid);
   report.entities[entity] = { source: rows.length, writtenOrPlanned: valid.length, skipped };

@@ -24,7 +24,7 @@ export function awsApiBase() {
   return (globalThis.E3I_CONFIG?.awsApiBase || '').replace(/\/$/, '');
 }
 
-async function request(path, { method = 'GET', body } = {}) {
+export async function awsRequest(path, { method = 'GET', body } = {}) {
   const API_BASE = awsApiBase();
   if (!API_BASE) throw new Error('Backend AWS ainda não foi configurado.');
   const accessToken = await getAccessToken();
@@ -54,7 +54,7 @@ async function request(path, { method = 'GET', body } = {}) {
 
 export const awsData = Object.freeze({
   listPage: async (entity, { limit = 100, cursor } = {}) => {
-    const page = await request(`${entity}?limit=${encodeURIComponent(limit)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+    const page = await awsRequest(`${entity}?limit=${encodeURIComponent(limit)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
     for (const record of page.items || []) remember(entity, record);
     return page;
   },
@@ -62,22 +62,22 @@ export const awsData = Object.freeze({
     const records = [];
     let cursor;
     do {
-      const page = await request(`${entity}?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+      const page = await awsRequest(`${entity}?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
       if (Array.isArray(page)) return page;
       records.push(...(page.items || []).map(record => remember(entity, record)));
       cursor = page.cursor;
     } while (cursor);
     return records;
   },
-  get: async (entity, id) => remember(entity, await request(`${entity}/${encodeURIComponent(id)}`)),
-  create: async (entity, values) => remember(entity, await request(entity, { method: 'POST', body: values })),
+  get: async (entity, id) => remember(entity, await awsRequest(`${entity}/${encodeURIComponent(id)}`)),
+  create: async (entity, values) => remember(entity, await awsRequest(entity, { method: 'POST', body: values })),
   update: async (entity, id, values) => {
     const key = `${entity}:${id}`;
-    if (!versions.has(key)) remember(entity, await request(`${entity}/${encodeURIComponent(id)}`));
-    return remember(entity, await request(`${entity}/${encodeURIComponent(id)}`, { method: 'PATCH', body: { ...values, version: versions.get(key) } }));
+    if (!versions.has(key)) remember(entity, await awsRequest(`${entity}/${encodeURIComponent(id)}`));
+    return remember(entity, await awsRequest(`${entity}/${encodeURIComponent(id)}`, { method: 'PATCH', body: { ...values, version: versions.get(key) } }));
   },
-  remove: (entity, id) => request(`${entity}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  uploadUrl: (values) => request('files/upload-url', { method: 'POST', body: values }),
-  downloadUrl: (path) => request('files/download-url', { method: 'POST', body: { path } }),
-  me: () => request('me')
+  remove: (entity, id) => awsRequest(`${entity}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  uploadUrl: (values) => awsRequest('files/upload-url', { method: 'POST', body: values }),
+  downloadUrl: (path) => awsRequest('files/download-url', { method: 'POST', body: { path } }),
+  me: () => awsRequest('me')
 });
