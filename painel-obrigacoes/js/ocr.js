@@ -129,8 +129,8 @@ async function renderPdfPageToCanvas(pdf, pageNumber = 1, scale = 2) {
 
 // --- Tesseract worker helper (singleton) ---------------------------------
 // Usa URLs explícitas e versões fixas. O worker executa o núcleo do Tesseract
-// em WebAssembly. A CSP libera apenas `wasm-unsafe-eval`, necessário para WASM,
-// sem liberar `unsafe-eval` (eval/new Function) para JavaScript.
+// em WebAssembly. A CSP permite a execução dinâmica exigida pelas bibliotecas,
+// mas `script-src-elem` mantém scripts inline e origens não autorizadas bloqueados.
 let _tessWorker = null;
 let _tessWorkerInitPromise = null;
 
