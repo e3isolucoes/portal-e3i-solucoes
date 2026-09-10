@@ -21,17 +21,18 @@ for (const completion of files) {
   const sourcePath = String(completion.attachment_path).replace(/^\/+/, '');
   const targetKey = `${config.toolId}/${config.appEnv}/${completion.workspace_id}/legacy/${sourcePath}`;
   try {
-    try {
-      await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: targetKey }));
-      report.alreadyPresent += 1; continue;
-    } catch (error) { if (error.$metadata?.httpStatusCode !== 404 && error.name !== 'NotFound') throw error; }
     const source = await fetch(`${config.supabaseUrl}/storage/v1/object/authenticated/comprovantes/${sourcePath.split('/').map(encodeURIComponent).join('/')}`, { headers: { apikey: config.serviceKey, authorization: `Bearer ${config.serviceKey}` } });
     if (!source.ok) throw new Error(`Supabase Storage ${source.status}`);
     const bytes = new Uint8Array(await source.arrayBuffer());
     const sha256 = createHash('sha256').update(bytes).digest('hex');
+    try {
+      const existing = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: targetKey }));
+      if (existing.Metadata?.sha256 !== sha256 || existing.Metadata?.workspace !== completion.workspace_id || existing.Metadata?.completion !== completion.id) throw new Error('conflito: objeto existente diverge da origem');
+      report.alreadyPresent += 1; continue;
+    } catch (error) { if (error.$metadata?.httpStatusCode !== 404 && error.name !== 'NotFound') throw error; }
     await s3.send(new PutObjectCommand({ Bucket: bucket, Key: targetKey, Body: bytes, ContentType: source.headers.get('content-type') || 'application/octet-stream', Metadata: { workspace: completion.workspace_id, source: 'supabase', sha256, completion: completion.id } }));
     report.copied += 1;
-  } catch (error) { report.failed.push({ completionId: completion.id, sourcePath, error: error.message }); }
+  } catch (error) { report.failed.push({ completionId: completion.id, error: error.message }); }
 }
 report.finishedAt = new Date().toISOString();
 console.log(JSON.stringify(report, null, 2));

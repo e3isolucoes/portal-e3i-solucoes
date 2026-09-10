@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { fetchAll, requiredEnv } from './shared.mjs';
+import { writeJson } from './manifest.mjs';
 
 const config = requiredEnv();
 const bucket = process.env.FILES_BUCKET;
@@ -25,10 +26,12 @@ for (const completion of files) {
     if (target.Metadata?.completion !== completion.id) throw new Error('completion divergente');
     report.verified += 1;
   } catch (error) {
-    report.failed.push({ completionId: completion.id, sourcePath, error: error.message });
+    report.failed.push({ completionId: completion.id, error: error.message });
   }
 }
 
 report.matches = report.failed.length === 0 && report.verified === report.source;
+const reportIndex = process.argv.indexOf('--report');
+if (reportIndex >= 0 && process.argv[reportIndex + 1]) await writeJson(process.argv[reportIndex + 1], report);
 console.log(JSON.stringify(report, null, 2));
 if (!report.matches) process.exitCode = 2;
