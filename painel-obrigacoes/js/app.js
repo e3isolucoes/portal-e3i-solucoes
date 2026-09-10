@@ -132,8 +132,8 @@ async function boot() {
     const portalSession = await completePortalSso();
     if (portalSession) { await enterApp(portalSession); return; }
   } catch (error) {
-    console.error('Falha no acesso único do portal', error);
-    showLogin('O acesso automático expirou. Volte ao Portal E3I e abra a ferramenta novamente.');
+    console.error('Falha no acesso único do portal', { status: error.status, requestId: error.requestId });
+    showLogin(error.message || 'O acesso automático expirou. Volte ao Portal E3I e abra a ferramenta novamente.');
     return;
   }
 

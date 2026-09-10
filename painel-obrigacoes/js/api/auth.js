@@ -121,6 +121,23 @@ export function setSession(tokens) {
 
 function readStoredSession() { return memorySession; }
 
+export async function readPortalSsoResponse(response) {
+  const contentType = String(response.headers?.get?.('content-type') || '').toLowerCase();
+  let body = {};
+  if (contentType.includes('application/json')) {
+    body = await response.json().catch(() => ({}));
+  }
+  if (response.ok) return body;
+  const unavailable = [502, 503, 504].includes(response.status);
+  const message = unavailable
+    ? 'O serviço do Painel está temporariamente indisponível. Tente novamente em alguns instantes.'
+    : body.error || 'Código de acesso inválido ou expirado.';
+  throw Object.assign(new Error(message), {
+    status: response.status,
+    requestId: body.requestId || response.headers?.get?.('x-request-id') || null,
+  });
+}
+
 export async function completePortalSso(location = window.location) {
   const params = new URLSearchParams(location.search || '');
   const fragment = new URLSearchParams((location.hash || '').replace(/^#/, ''));
@@ -139,8 +156,7 @@ export async function completePortalSso(location = window.location) {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: launchCode }),
       credentials: 'include', cache: 'no-store',
     });
-    const tokens = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(tokens.error || 'Código de acesso inválido ou expirado.');
+    const tokens = await readPortalSsoResponse(response);
     const restored = await setSession(tokens);
     if (restored.error || !restored.data.session) throw restored.error || new Error('Sessão AWS não foi criada.');
     return restored.data.session;

@@ -102,3 +102,33 @@ test('restaura sessão temporária da ferramenta sem exigir refresh token', asyn
   delete globalThis.E3I_CONFIG;
   delete globalThis.localStorage;
 });
+
+test('trata resposta HTML 502 do gateway sem tentar interpretá-la como JSON', async () => {
+  const { readPortalSsoResponse } = await import('../js/api/auth.js');
+  let parsed = false;
+  const response = {
+    ok: false,
+    status: 502,
+    headers: { get: name => name === 'content-type' ? 'text/html; charset=utf-8' : null },
+    json: async () => { parsed = true; throw new Error('Unexpected token <'); },
+  };
+
+  await assert.rejects(() => readPortalSsoResponse(response), error => (
+    error.status === 502 && /temporariamente indisponível/.test(error.message)
+  ));
+  assert.equal(parsed, false);
+});
+
+test('preserva mensagem e request ID de erro JSON na troca do SSO', async () => {
+  const { readPortalSsoResponse } = await import('../js/api/auth.js');
+  const response = {
+    ok: false,
+    status: 401,
+    headers: { get: name => name === 'content-type' ? 'application/json' : null },
+    json: async () => ({ error: 'Código expirado.', requestId: 'request-1' }),
+  };
+
+  await assert.rejects(() => readPortalSsoResponse(response), error => (
+    error.status === 401 && error.requestId === 'request-1' && error.message === 'Código expirado.'
+  ));
+});
