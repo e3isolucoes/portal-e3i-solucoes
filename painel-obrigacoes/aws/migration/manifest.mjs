@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { administrationPk, enrichRows, entities, membershipItem, toItem } from './shared.mjs';
@@ -70,7 +70,31 @@ export function classifyTarget(existing, current, previous) {
 export function createManifest(config, built, label = 'snapshot') {
   const keys = built.map(({ manifest }) => keyOf(manifest.targetKey));
   if (new Set(keys).size !== keys.length) throw new Error('Manifesto inválido: target key duplicada.');
-  return { schemaVersion: 1, label, createdAt: new Date().toISOString(), toolId: config.toolId, environment: config.appEnv, items: built.map(({ manifest }) => manifest) };
+  return { schemaVersion: 1, executionId: randomUUID(), label, createdAt: new Date().toISOString(), toolId: config.toolId, environment: config.appEnv, items: built.map(({ manifest }) => manifest) };
+}
+
+export function validateManifest(manifest, config) {
+  if (!manifest || manifest.schemaVersion !== 1 || typeof manifest.executionId !== 'string'
+    || !/^[a-f0-9-]{36}$/.test(manifest.executionId) || !Array.isArray(manifest.items)) {
+    throw new Error('Manifesto inválido ou versão não suportada.');
+  }
+  if (manifest.toolId !== config.toolId || manifest.environment !== config.appEnv) {
+    throw new Error('Manifesto pertence a outra ferramenta ou ambiente.');
+  }
+  const keys = new Set();
+  const validEntities = new Set([...Object.keys(entities), 'membership', 'administrative_workspace']);
+  for (const item of manifest.items) {
+    if (!item || !validEntities.has(item.entity) || typeof item.sourceKey !== 'string'
+      || !Object.hasOwn(item, 'workspace') || (item.workspace !== null && typeof item.workspace !== 'string')
+      || !item.targetKey || typeof item.targetKey.PK !== 'string' || typeof item.targetKey.SK !== 'string'
+      || !/^[a-f0-9]{64}$/.test(item.contentHash)) {
+      throw new Error('Manifesto contém entrada incompleta ou hash SHA-256 inválido.');
+    }
+    const key = keyOf(item.targetKey);
+    if (keys.has(key)) throw new Error('Manifesto inválido: target key duplicada.');
+    keys.add(key);
+  }
+  return manifest;
 }
 
 export function classifyExtras(keys, allowlist) {

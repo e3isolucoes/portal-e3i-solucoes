@@ -43,6 +43,10 @@ conflito explícito, sem sobrescrita.
 - **PASS `apply`:** `status=PASS`, `conflicts=[]`; deleções esperadas são zero ou
   foram aprovadas e executadas com `--apply-deletes`. **FAIL:** qualquer conflito,
   inclusive item do destino alterado depois da migração.
+- **PASS de identidade do manifesto:** `schemaVersion`, ferramenta e ambiente
+  coincidem com a execução, há um `executionId`, todas as chaves são únicas e todo hash tem 64 dígitos
+  hexadecimais. **FAIL:** manifesto adulterado, incompleto, duplicado ou produzido
+  para outro ambiente; nenhum acesso ao target deve começar nesse caso.
 - **PASS `verify-content`:** `status=PASS`, `mismatches=[]` para 100% dos itens.
   Um byte/campo diferente, ausente ou adicional é **FAIL**.
 - **PASS `verify-keys --cutover`:** zero missing e zero extras fora da allowlist.

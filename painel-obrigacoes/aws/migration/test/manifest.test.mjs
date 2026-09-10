@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildItems, canonicalJson, classifyExtras, classifyTarget, contentHash, createManifest, diffManifests } from '../manifest.mjs';
+import { buildItems, canonicalJson, classifyExtras, classifyTarget, contentHash, createManifest, diffManifests, validateManifest } from '../manifest.mjs';
 
 const config = { toolId: 'painel', appEnv: 'test' };
 const empty = () => ({ workspaces: [], profiles: [], companies: [], obligations: [], completions: [], obligation_comments: [], audit_log: [], holidays: [], checklist_items: [], obligation_rules: [], obligation_date_overrides: [], tax_regimes: [], tax_regime_rules: [], categories: [] });
@@ -52,4 +52,15 @@ test('extra é classificado e somente allowlist explícita o aprova', () => {
   const keys = ['P\u0000COMPANY#extra'];
   assert.equal(classifyExtras(keys, [])[0].classification, 'unapproved');
   assert.equal(classifyExtras(keys, [{ PK: 'P', SK: 'COMPANY#extra' }])[0].classification, 'allowlisted');
+});
+
+test('rejeita manifesto adulterado, duplicado ou de outro ambiente', () => {
+  const rows = empty(); rows.workspaces.push({ id: 'w1' });
+  const manifest = createManifest(config, buildItems(config, rows));
+  assert.equal(validateManifest(manifest, config), manifest);
+  assert.throws(() => validateManifest({ ...manifest, environment: 'prod' }, config), /outra ferramenta ou ambiente/);
+  assert.throws(() => validateManifest({ ...manifest, items: [{ ...manifest.items[0], contentHash: 'adulterado' }] }, config), /SHA-256 inválido/);
+  assert.throws(() => validateManifest({ ...manifest, items: [manifest.items[0], manifest.items[0]] }, config), /duplicada/);
+  const { workspace, ...withoutWorkspace } = manifest.items[0];
+  assert.throws(() => validateManifest({ ...manifest, items: [withoutWorkspace] }, config), /entrada incompleta/);
 });
