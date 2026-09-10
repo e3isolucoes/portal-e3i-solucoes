@@ -1,7 +1,8 @@
 import { createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
-import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { membershipPk } from './model.mjs';
+import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { entitySk, membershipPk, tenantPk } from './model.mjs';
 import { canonicalRole } from './contract.mjs';
+import { requireWorkspaceAvailable } from './workspace-access.mjs';
 
 const jwksByIssuer = new Map();
 
@@ -63,11 +64,18 @@ export async function authenticate(event, documentClient, tableName) {
   const requested = event.headers?.['x-workspace-id'] || event.headers?.['X-Workspace-Id'];
   const membership = requested ? active.find((item) => item.workspaceId === requested) : active[0];
   if (!membership) throw Object.assign(new Error('Acesso à empresa não concedido.'), { statusCode: 403 });
+  const role = canonicalRole(membership.role) || 'member';
+  if (role !== 'super_admin') {
+    const workspace = (await documentClient.send(new GetCommand({
+      TableName: tableName, Key: { PK: tenantPk(membership.workspaceId), SK: entitySk('workspaces', membership.workspaceId) }, ConsistentRead: true,
+    }))).Item;
+    requireWorkspaceAvailable(workspace);
+  }
   return {
     userId,
     email: payload.email,
     workspaceId: membership.workspaceId,
-    role: canonicalRole(membership.role) || 'member',
+    role,
     moduleGrants: Array.isArray(membership.module_grants) ? membership.module_grants : null,
     issuer,
     tokenId: payload.jti || null,

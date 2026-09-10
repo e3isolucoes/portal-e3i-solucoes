@@ -24,7 +24,7 @@ import {
   fetchTaxRegimes, createTaxRegime, updateTaxRegime, deleteTaxRegime as apiDeleteTaxRegime,
   fetchTaxRegimeRules, linkRuleToRegime, unlinkRuleFromRegime,
 } from './api/taxRegimes.js';
-import { createUserAccount } from './api/adminUsers.js';
+import { createUserAccount, isAwsAdminBackend, removeUserMembership, updateUserMembership } from './api/adminUsers.js';
 import { signOut, sendPasswordResetEmail, fetchMyProfile } from './api/auth.js';
 import { uploadAttachment } from './api/storage.js';
 import { completeDialog } from './ui/completeDialog.js?v=20260908-csp-wasm-v2';
@@ -1004,14 +1004,14 @@ export async function doCreateUser(formData, onDone) {
     return;
   }
 
-  if (password.length < 6) { showToast('A senha precisa ter pelo menos 6 caracteres.', 'error'); return; }
+  if (!isAwsAdminBackend() && password.length < 6) { showToast('A senha precisa ter pelo menos 6 caracteres.', 'error'); return; }
 
   try {
-    const { user } = await createUserAccount({ email, password, displayName });
+    const { user, profile: serverProfile } = await createUserAccount({ email, password, displayName, workspaceId, role });
     if (!user) throw new Error('O cadastro não retornou o usuário criado.');
 
     try {
-      const profile = await updateProfile(user.id, { display_name: displayName, role, workspace_id: workspaceId });
+      const profile = serverProfile || await updateProfile(user.id, { display_name: displayName, role, workspace_id: workspaceId });
       STATE.profiles = STATE.profiles.filter((p) => p.id !== profile.id).concat(profile);
       STATE.profiles.sort((a, b) => a.email.localeCompare(b.email));
     } catch (err) {
@@ -1022,8 +1022,8 @@ export async function doCreateUser(formData, onDone) {
       showToast('Conta criada, mas não deu para ajustar nome/papel agora — corrija na lista abaixo.', 'info');
     }
 
-    STATE.pendingNewUserCredentials = { email, password };
-    showToast('Conta criada com sucesso.', 'success');
+    if (!isAwsAdminBackend()) STATE.pendingNewUserCredentials = { email, password };
+    showToast(isAwsAdminBackend() ? 'Convite enviado por e-mail com sucesso.' : 'Conta criada com sucesso.', 'success');
     onDone?.();
   } catch (err) {
     console.error(err);
@@ -1044,6 +1044,22 @@ export async function doCreateUser(formData, onDone) {
 export async function doChangeUserWorkspace(profileId, workspaceId, onDone) {
   if (!isSuperUser()) return;
   try {
+    if (isAwsAdminBackend()) {
+      const existing = STATE.profiles.find((profile) => profile.id === profileId);
+      const previousWorkspaceId = existing?.workspace_id;
+      const moving = workspaceId && previousWorkspaceId && previousWorkspaceId !== workspaceId;
+      if (workspaceId) await updateUserMembership(profileId, workspaceId, { email: existing?.email, displayName: existing?.display_name, role: existing?.role });
+      try {
+        if (previousWorkspaceId && previousWorkspaceId !== workspaceId) await removeUserMembership(profileId, previousWorkspaceId);
+      } catch (error) {
+        if (moving) await removeUserMembership(profileId, workspaceId).catch(() => {});
+        throw error;
+      }
+      const updated = { ...existing, workspace_id: workspaceId || null };
+      STATE.profiles = STATE.profiles.map((profile) => (profile.id === profileId ? updated : profile));
+      showToast(workspaceId ? 'Vínculo empresarial atualizado.' : 'Vínculo empresarial removido.', 'success');
+      return;
+    }
     const updated = await updateProfile(profileId, { workspace_id: workspaceId || null });
     STATE.profiles = STATE.profiles.map((profile) => (profile.id === profileId ? updated : profile));
     showToast(workspaceId ? 'Vínculo empresarial atualizado.' : 'Vínculo empresarial removido.', 'success');
@@ -1057,7 +1073,9 @@ export async function doChangeUserWorkspace(profileId, workspaceId, onDone) {
 
 async function doUpdateExistingUser(existing, { displayName, role, workspace_id: workspaceId }, onDone) {
   try {
-    const updated = await updateProfile(existing.id, { display_name: displayName, role, workspace_id: workspaceId || null });
+    const updated = isAwsAdminBackend()
+      ? { ...existing, display_name: displayName, role: (await updateUserMembership(existing.id, workspaceId, { role })).role, workspace_id: workspaceId }
+      : await updateProfile(existing.id, { display_name: displayName, role, workspace_id: workspaceId || null });
     STATE.profiles = STATE.profiles.map((p) => (p.id === existing.id ? updated : p));
     if (existing.id === STATE.session?.id) STATE.profile = updated;
     showToast(`Já existia uma conta com esse e-mail — dados de ${updated.display_name || updated.email} atualizados.`, 'success');

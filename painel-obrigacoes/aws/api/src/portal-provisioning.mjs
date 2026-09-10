@@ -81,6 +81,7 @@ export async function provisionPortalAccess(client, tableName, input) {
   const timestamp = new Date().toISOString();
   const auditId = randomUUID();
   const workspacePk = tenantPk(data.workspaceId);
+  const administrationPk = `TOOL#${TOOL_ID}#ENV#${APP_ENV}#ADMINISTRATION`;
   const metadata = { ':tool': TOOL_ID, ':environment': APP_ENV, ':schema': SCHEMA_VERSION, ':now': timestamp };
 
   await client.send(new TransactWriteCommand({ TransactItems: [
@@ -90,6 +91,13 @@ export async function provisionPortalAccess(client, tableName, input) {
       UpdateExpression: 'SET userId=:userId, workspaceId=:workspaceId, #email=:email, active=:true, #role=if_not_exists(#role,:member), toolId=:tool, environment=:environment, entityType=:membership, schemaVersion=:schema, updated_at=:now, created_at=if_not_exists(created_at,:now)',
       ExpressionAttributeNames: { '#role': 'role', '#email': 'email' },
       ExpressionAttributeValues: { ...metadata, ':workspaceId': data.workspaceId, ':userId': data.userId, ':email': data.email, ':true': true, ':member': 'member', ':membership': 'membership' },
+    } },
+    { Update: {
+      TableName: tableName,
+      Key: { PK: administrationPk, SK: `WORKSPACE#${data.workspaceId}` },
+      UpdateExpression: 'SET id=:workspaceId, workspace_id=:workspaceId, #name=:workspaceName, document=:document, access_status=if_not_exists(access_status,:full), version=if_not_exists(version,:one), toolId=:tool, environment=:environment, entityType=:workspace, #scope=:administration, schemaVersion=:schema, updated_at=:now, created_at=if_not_exists(created_at,:now)',
+      ExpressionAttributeNames: { '#name': 'name', '#scope': 'scope' },
+      ExpressionAttributeValues: { ...metadata, ':workspaceId': data.workspaceId, ':workspaceName': data.workspaceName, ':document': data.document, ':full': 'full', ':one': 1, ':workspace': 'workspaces', ':administration': 'administration' },
     } },
     { Update: {
       TableName: tableName,

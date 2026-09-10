@@ -35,7 +35,13 @@ report.administration = {
   target: administrativeTarget,
   match: administrativeProfiles.length === administrativeTarget
 };
+const administrativeWorkspacesTarget = await countPrefix(client, config.table, administrationPk(config), 'WORKSPACE');
+report.administrativeWorkspaces = {
+  source: workspaces.length,
+  target: administrativeWorkspacesTarget,
+  match: workspaces.length === administrativeWorkspacesTarget
+};
 
-if (!report.memberships.match || !report.administration.match) report.matches = false;
+if (!report.memberships.match || !report.administration.match || !report.administrativeWorkspaces.match) report.matches = false;
 console.log(JSON.stringify(report, null, 2));
 if (!report.matches) process.exitCode = 2;

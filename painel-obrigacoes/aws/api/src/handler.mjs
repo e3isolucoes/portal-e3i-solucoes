@@ -8,11 +8,13 @@ import { claimPortalProvisioningNonce, provisionPortalAccess, verifyPortalProvis
 import { consumePortalSession, createPortalSession } from './portal-session.mjs';
 import { createPasswordSession, issueBrowserSession, readRefreshCookie, refreshCookie, revokeBrowserSession, rotateBrowserSession } from './browser-session.mjs';
 import { Repository } from './repository.mjs';
+import { AdminService } from './admin.mjs';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
 const s3 = new S3Client({});
 const cognito = new CognitoIdentityProviderClient({});
 const repository = new Repository(ddb, process.env.TABLE_NAME);
+const adminService = new AdminService(ddb, cognito, process.env.TABLE_NAME, process.env.USER_POOL_ID);
 
 function allowedOrigin(event) {
   const allowlist = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || '')
@@ -73,23 +75,49 @@ export async function handler(event) {
     }
 
     const auth = await authenticate(event, ddb, process.env.TABLE_NAME);
+    return handleAuthenticatedRequest(event, auth, { repository, adminService });
+  } catch (error) {
+    return errorResponse(error, event, requestId);
+  }
+}
+
+export async function handleAuthenticatedRequest(event, auth, dependencies) {
+  const requestId = event.requestContext?.requestId;
+  try {
+    const method = event.requestContext?.http?.method || event.httpMethod;
+    const path = (event.rawPath || event.path || '/').replace(/^\/v1\/?/, '');
+    const repositoryDependency = dependencies.repository;
+    const admin = dependencies.adminService || adminService;
+    if (method === 'GET' && path === 'admin/workspaces') return response(200, await admin.listWorkspaces(auth, listOptions(event)), event);
+    if (method === 'POST' && path === 'admin/workspaces') return response(201, await admin.createWorkspace(auth, parseBody(event)), event);
+    const workspaceMatch = path.match(/^admin\/workspaces\/([^/]+)$/);
+    if (method === 'PATCH' && workspaceMatch) return response(200, await admin.updateWorkspace(auth, decodeURIComponent(workspaceMatch[1]), parseBody(event)), event);
+    if (method === 'POST' && path === 'admin/users') return response(201, await admin.inviteUser(auth, parseBody(event)), event);
+    const membershipMatch = path.match(/^admin\/users\/([^/]+)\/memberships\/([^/]+)$/);
+    if (method === 'PATCH' && membershipMatch) return response(200, await admin.setMembership(auth, ...membershipMatch.slice(1).map(decodeURIComponent), parseBody(event)), event);
+    if (method === 'DELETE' && membershipMatch) { await admin.removeMembership(auth, ...membershipMatch.slice(1).map(decodeURIComponent)); return response(204, {}, event); }
     if (method === 'GET' && path === 'me') return response(200, { userId: auth.userId, email: auth.email, workspaceId: auth.workspaceId, role: auth.role, moduleGrants: auth.moduleGrants }, event);
     if (path === 'files/upload-url' && method === 'POST') return response(200, await createUploadUrl(s3, process.env.FILES_BUCKET, auth, parseBody(event)), event);
     if (path === 'files/download-url' && method === 'POST') return response(200, await createDownloadUrl(s3, process.env.FILES_BUCKET, auth, parseBody(event).path), event);
 
     const [entity, id] = path.split('/').map(decodeURIComponent);
-    if (method === 'GET' && !id) return response(200, await repository.list(auth, entity, listOptions(event)), event);
-    if (method === 'GET' && id) return response(200, await repository.get(auth, entity, id), event);
-    if (method === 'POST' && !id) return response(201, await repository.create(auth, entity, parseBody(event)), event);
-    if (method === 'PATCH' && id) return response(200, await repository.update(auth, entity, id, parseBody(event)), event);
+    if (method === 'GET' && !id) return response(200, await repositoryDependency.list(auth, entity, listOptions(event)), event);
+    if (method === 'GET' && id) return response(200, await repositoryDependency.get(auth, entity, id), event);
+    if (method === 'POST' && !id) return response(201, await repositoryDependency.create(auth, entity, parseBody(event)), event);
+    if (method === 'PATCH' && id) return response(200, await repositoryDependency.update(auth, entity, id, parseBody(event)), event);
     if (method === 'DELETE' && id) {
-      const deletion = await repository.remove(auth, entity, id);
+      const deletion = await repositoryDependency.remove(auth, entity, id);
       return response(deletion ? 202 : 204, deletion || {}, event);
     }
     return response(404, { error: 'Rota não encontrada.', requestId }, event);
   } catch (error) {
     const status = error.statusCode || 500;
-    console.error(JSON.stringify({ level: 'error', requestId, status, name: error.name, message: status < 500 ? error.message : 'internal_error' }));
-    return response(status, { error: status < 500 ? error.message : 'Erro interno.', requestId }, event);
+    return errorResponse(error, event, requestId);
   }
+}
+
+function errorResponse(error, event, requestId) {
+  const status = error.statusCode || 500;
+  console.error(JSON.stringify({ level: 'error', requestId, status, name: error.name, message: status < 500 ? error.message : 'internal_error' }));
+  return response(status, { error: status < 500 ? error.message : 'Erro interno.', requestId }, event);
 }
