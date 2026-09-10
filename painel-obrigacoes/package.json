@@ -2,7 +2,7 @@
   "name": "painel-obrigacoes-alertas",
   "private": true,
   "type": "module",
-  "description": "Dependências usadas apenas pelo script scripts/enviar-alertas.mjs (alertas diários por e-mail, rodado via GitHub Actions). O painel em si não tem build nem dependências — é HTML/CSS/JS puro servido estaticamente.",
+  "description": "Dependências legadas mantidas apenas para rollback manual dos alertas após o cutover para AWS. O painel em si não tem build nem dependências — é HTML/CSS/JS puro servido estaticamente.",
   "scripts": {
     "build": "echo 'Nenhum build necessário para site estático'",
     "test": "node --test test/*.test.js aws/api/test/*.test.mjs",

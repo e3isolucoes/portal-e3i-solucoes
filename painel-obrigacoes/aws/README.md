@@ -103,3 +103,18 @@ A tabela principal usa capacidade provisionada governada em `20 RCU / 5 WCU`, co
 ## Variáveis da migração
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DYNAMODB_TABLE`, `AWS_REGION`, `TOOL_ID` e `APP_ENV`. A `service_role` é secreta e deve ser rotacionada após a migração.
+
+## Alertas após o cutover
+
+Foi escolhida a opção **EventBridge Scheduler + Lambda dedicada**. Ela elimina o
+job agendado e seus segredos no GitHub, usa a role efêmera da própria Lambda e
+reduz a operação a recursos observáveis no mesmo stack. A Lambda consulta cada
+partição de workspace separadamente, pagina todas as respostas e envia com SES;
+assim não há chave da Resend nem credencial AWS estática. Uma migração para
+Resend aqui adicionaria um segredo server-side sem benefício operacional.
+
+O agendamento nasce `DISABLED` para permitir o cutover governado e deve ser
+habilitado somente depois da validação manual descrita acima. Entregas têm um
+registro diário por destinatário (hash, sem e-mail) para deduplicar retries. O
+script `scripts/enviar-alertas-legacy-supabase.mjs` existe exclusivamente para
+rollback manual e não é referenciado por nenhum schedule ou workflow.

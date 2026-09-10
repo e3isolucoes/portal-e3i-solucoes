@@ -1,16 +1,41 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { collectAlerts, groupRecipients, html } from '../src/notification-core.mjs';
+import { collectDeadlineAlerts, mismatchItems, recipientsForAlerts } from '../../../scripts/alertas-core.mjs';
+import { loadDynamoWorkspaces, normalizeDynamoItems, normalizeSupabaseFixture } from '../src/notification-datasource.mjs';
 
-const obligation = { id: 'o1', entityType: 'obligations', workspace_id: 'w1', name: '<Fechamento>', frequency: 'pontual', due_date: '2026-08-29', responsible_id: 'u1', module_key: 'financeiro' };
-const records = [obligation, { id: 'u1', entityType: 'profiles', workspace_id: 'w1', email: 'a@example.com', active: true, role: 'membro' }, { id: 'g1', entityType: 'profiles', workspace_id: 'w1', email: 'g@example.com', active: true, role: 'gestor', module_access: ['financeiro'] }];
+const supabase = {
+  obligations: [{ id: 'o1', workspace_id: 'w1', name: 'Fechamento', frequency: 'pontual', due_date: '2026-08-29', responsible_id: 'u1', module_key: 'financeiro' }],
+  completions: [{ id: 'c1', workspace_id: 'w1', obligation_id: 'o1', occurrence_date: '2026-08-20', done_at: '2026-08-27T15:00:00.000Z', ocr_status: 'mismatch' }],
+  holidays: [{ id: 'h1', workspace_id: 'w1', holiday_date: '2026-08-28' }],
+  profiles: [{ id: 'u1', workspace_id: 'w1', email: 'a@example.com', active: true, role: 'membro' }, { id: 'off', workspace_id: 'w1', email: 'off@example.com', active: false, role: 'admin' }, { id: 'g1', workspace_id: 'w1', email: 'g@example.com', active: true, role: 'gestor', module_access: ['financeiro'] }],
+  obligation_date_overrides: [{ id: 'v1', workspace_id: 'w1', obligation_id: 'o1', original_date: '2026-08-29', override_date: '2026-08-30' }]
+};
+const dynamoItems = Object.entries(supabase).flatMap(([type, rows]) => rows.map((row) => ({ PK: 'tenant', SK: `${type}#${row.id}`, entityType: type, ...row })));
 
-test('DynamoDB gera alerta e restringe destinatários ao workspace e módulo', () => {
-  const alerts = collectAlerts(records, { now: new Date('2026-08-27T12:00:00-03:00') });
-  assert.equal(alerts.length, 1);
-  const recipients = groupRecipients([...records, { id: 'g2', entityType: 'profiles', workspace_id: 'w2', email: 'x@example.com', role: 'admin' }], alerts);
-  assert.deepEqual([...recipients.owners.keys()], ['u1']);
-  assert.deepEqual([...recipients.managers.keys()], ['g1']);
+function output(data) {
+  const alerts = collectDeadlineAlerts({ ...data, now: new Date('2026-08-27T12:00:00-03:00') });
+  const recipients = recipientsForAlerts({ alerts, profiles: data.profiles });
+  const mismatches = mismatchItems({ completions: data.completions, obligationById: new Map(data.obligations.map((item) => [item.id, item])), since: '2026-08-26T15:00:00.000Z' });
+  return { alerts: alerts.map((item) => [item.ob.id, item.occurrence.toISOString(), item.status.tone]), responsible: [...recipients.responsible.keys()], managers: [...recipients.managers.keys()], mismatches: mismatches.map((item) => item.id) };
+}
+
+test('fixtures Supabase e DynamoDB produzem exatamente o mesmo conjunto de alertas', () => {
+  assert.deepEqual(output(normalizeDynamoItems(dynamoItems, 'w1')), output(normalizeSupabaseFixture(supabase)));
+  assert.deepEqual(output(normalizeSupabaseFixture(supabase)).responsible, ['u1']);
+  assert.deepEqual(output(normalizeSupabaseFixture(supabase)).managers, ['g1']);
+  assert.deepEqual(output(normalizeSupabaseFixture(supabase)).mismatches, ['c1']);
 });
 
-test('HTML de dados operacionais é escapado', () => assert.equal(html('<Fechamento>'), '&lt;Fechamento&gt;'));
+test('datasource pagina descoberta e query por PK sem aceitar registros de outro tenant', async () => {
+  class Command { constructor(input) { this.input = input; } }
+  const calls = [];
+  const client = { send: async (command) => {
+    calls.push(command.input);
+    if (!command.input.KeyConditionExpression) return command.input.ExclusiveStartKey ? { Items: [{ id: 'w2', entityType: 'workspaces' }] } : { Items: [{ id: 'w1', entityType: 'workspaces' }], LastEvaluatedKey: { PK: 'next' } };
+    const workspace = command.input.ExpressionAttributeValues[':pk'].endsWith('#w1') ? 'w1' : 'w2';
+    return { Items: [{ ...dynamoItems[0], workspace_id: workspace }, { ...dynamoItems[0], workspace_id: workspace === 'w1' ? 'w2' : 'w1' }] };
+  } };
+  const result = await loadDynamoWorkspaces(client, 'table', { QueryCommand: Command, ScanCommand: Command });
+  assert.equal(calls.filter((call) => call.KeyConditionExpression).length, 2);
+  assert.deepEqual(result.map(({ workspaceId, data }) => [workspaceId, data.obligations.length]), [['w1', 1], ['w2', 1]]);
+});
