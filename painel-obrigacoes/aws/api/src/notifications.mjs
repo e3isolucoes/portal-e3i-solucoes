@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { collectDeadlineAlerts, itemsHtml, mismatchItems, mismatchesHtml, recipientsForAlerts } from '../../../scripts/alertas-core.mjs';
-import { loadDynamoWorkspaces } from './notification-datasource.mjs';
+import { loadDynamoWorkspaces, mismatchesForProfile } from './notification-datasource.mjs';
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
 const ses = new SESv2Client({});
@@ -41,7 +41,7 @@ async function sendDigest({ workspaceId, person, kind, subject, html, runDate })
 }
 
 export async function runNotifications({ now = new Date(), event = {}, client = dynamo } = {}) {
-  const workspaces = await loadDynamoWorkspaces(client, process.env.TABLE_NAME, { QueryCommand, ScanCommand });
+  const workspaces = await loadDynamoWorkspaces(client, process.env.TABLE_NAME, { QueryCommand });
   const deliveries = [];
   for (const { workspaceId, data } of workspaces) {
     const alerts = collectDeadlineAlerts({ ...data, daysAhead: Number(process.env.NOTIFICATION_DAYS_AHEAD || 5), now });
@@ -50,11 +50,12 @@ export async function runNotifications({ now = new Date(), event = {}, client = 
     const recentMismatches = mismatchItems({ completions: data.completions, obligationById, since: new Date(now.getTime() - 86400000).toISOString() });
     if (recentMismatches.length) data.profiles
       .filter((profile) => profile.active !== false && profile.email && ['admin', 'gestor'].includes(profile.role))
+      .filter((profile) => mismatchesForProfile(recentMismatches, profile).length)
       .forEach((person) => { if (!managers.has(person.id)) managers.set(person.id, { person, items: [] }); });
     if (event.dryRun === true) { deliveries.push(...[...responsible.values(), ...managers.values()].map(() => Promise.resolve('planned'))); continue; }
     for (const { person, items } of responsible.values()) deliveries.push(sendDigest({ workspaceId, person, kind: 'responsible', runDate: day(now), subject: `Painel de Obrigações — ${items.length} pendência(s) para você`, html: `<p>Olá, ${person.display_name || ''}.</p><p>Você tem ${items.length} obrigação(ões) atrasada(s) ou vencendo em breve:</p><ul>${itemsHtml(items)}</ul><p style="color:#5B6B70;font-size:12px;">Lembrete automático. Acesse o painel para atualizar ou concluir as atividades.</p>` }));
     for (const { person, items } of managers.values()) {
-      const mismatches = recentMismatches.filter((item) => item.obligation?.workspace_id === workspaceId);
+      const mismatches = mismatchesForProfile(recentMismatches, person);
       if (!items.length && !mismatches.length) continue;
       const pending = items.length ? `<p>Resumo das atividades atrasadas ou vencendo em breve na sua equipe:</p><ul>${itemsHtml(items, { showResponsible: true })}</ul>` : '<p>Nenhuma obrigação atrasada ou vencendo em breve na equipe hoje.</p>';
       const mismatch = mismatches.length ? `<p style="margin-top:16px;">Comprovantes com possível divergência de competência nas últimas 24h:</p><ul>${mismatchesHtml(mismatches)}</ul>` : '';
