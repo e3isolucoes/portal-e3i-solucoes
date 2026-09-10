@@ -363,73 +363,20 @@ dos dados, por segurança:
 Isso não custa nada e não depende de nenhuma ferramenta paga — é só um
 hábito recomendado para não depender só do que está online.
 
-## 12. Alertas diários por e-mail (opcional, gratuito)
+## 12. Alertas diários por e-mail
 
-O painel pode mandar um e-mail toda manhã (dias úteis) para cada pessoa
-com o que está atrasado ou vencendo em breve, mais um resumo geral para os
-administradores. Isso roda fora do navegador, agendado pelo GitHub Actions
-— não precisa de nenhum servidor rodando o tempo todo.
+Após o cutover, os alertas são executados por **EventBridge Scheduler + Lambda**
+no stack SAM de `aws/template.yaml`. A Lambda lê partições isoladas do DynamoDB
+e envia por Amazon SES com uma role de execução temporária; produção não usa
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, credenciais AWS no GitHub nem chave
+da Resend.
 
-O agendamento padrão é às **08h30 no horário de São Paulo**, de segunda a
-sexta-feira. Responsáveis recebem suas próprias atividades. Administradores e
-gestores recebem o resumo do próprio workspace; gestores ficam restritos aos
-módulos liberados em seu perfil. Datas ajustadas manualmente são respeitadas.
-
-### Redefinição de senha
-
-O reset de senha é enviado pelo Supabase Auth, emissor dos links seguros e de
-uso único. Em **Authentication → URL Configuration**, defina a URL pública do
-Azure como `Site URL`. Em **Authentication → Email Templates → Reset
-password**, use um assunto claro, como `Redefina sua senha — Gestão de
-Atividades`, mantenha o link `{{ .ConfirmationURL }}` e informe que ele expira
-e só deve ser aberto pelo destinatário. Configure também um SMTP próprio no
-Supabase antes da produção para evitar limites e remetentes genéricos.
-
-**1. Criar uma conta gratuita na Resend** (serviço de envio de e-mail —
-até 3.000 e-mails/mês grátis):
-
-1. Acesse **https://resend.com** e crie uma conta.
-2. Vá em **API Keys → Create API Key** e copie a chave gerada (só aparece
-   uma vez — guarde num lugar seguro).
-3. Em **Domains**, você pode usar o domínio de teste da própria Resend
-   para começar (o remetente fica algo como `onboarding@resend.dev`), ou
-   configurar um domínio próprio da empresa depois, se quiser um remetente
-   com a cara da empresa (ex.: `alertas@suaempresa.com.br`) — isso exige
-   adicionar alguns registros DNS, indicados pela própria Resend.
-
-**2. Pegar a `service_role key` do Supabase** (Project Settings → API →
-   em "Project API keys", a chave chamada **service_role**, não a "anon
-   public" que você já usou antes). Essa chave é secreta — nunca cole ela
-   em nenhum arquivo do projeto, só no lugar indicado no passo 3.
-
-**3. Configurar os Secrets no GitHub** (repositório que você criou no
-   passo 7):
-
-1. No GitHub, vá em **Settings → Secrets and variables → Actions → New
-   repository secret**.
-2. Crie os quatro secrets abaixo (um de cada vez):
-   - `SUPABASE_URL` — a mesma URL do passo 6.
-   - `SUPABASE_SERVICE_ROLE_KEY` — a chave do passo 2 acima.
-   - `RESEND_API_KEY` — a chave do passo 1 acima.
-   - `ALERT_FROM_EMAIL` — o remetente, ex.: `Painel de Obrigações <onboarding@resend.dev>` (ou o seu domínio próprio).
-
-**4. Testar manualmente antes de confiar no agendamento automático:**
-
-1. No GitHub, vá na aba **Actions** do repositório.
-2. Clique no workflow **"Alertas diários de obrigações"**.
-3. Clique em **Run workflow** (botão à direita) para rodar na hora, sem
-   esperar o horário agendado.
-4. Confira se o e-mail chegou para quem tem obrigação vencendo/atrasada
-   vinculada à própria conta. Se não chegar, clique na execução na aba
-   Actions para ver o log de erro (normalmente é secret com nome errado,
-   ou chave copiada com espaço a mais).
-
-Depois de confirmado, o workflow já roda sozinho todo dia útil às 8h30
-(horário de Brasília) — não precisa fazer mais nada. Para desligar,
-apague ou renomeie o arquivo `.github/workflows/alertas-diarios.yml`.
-
-> **Isso é opcional.** Se você não configurar os Secrets, o painel
-> continua funcionando normalmente — só não manda os e-mails. Nada quebra.
+O schedule é criado desabilitado. Valide primeiro uma invocação controlada e a
+identidade/domínio SES conforme `aws/README.md`; só então altere
+`NotificationScheduleState` para `ENABLED` por processo de deploy aprovado. O
+workflow `alertas-diarios.yml` é apenas uma validação manual e não envia e-mail.
+Para emergência existe `scripts/enviar-alertas-legacy-supabase.mjs`, não agendado
+e claramente restrito a rollback manual.
 
 ## Onde pedir ajuda
 

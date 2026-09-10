@@ -25,7 +25,7 @@ painel-obrigacoes/
 ├── sw.js                     service worker mínimo (só para instalabilidade — não cacheia nada)
 ├── icons/                    ícones do PWA (192px e 512px)
 ├── staticwebapp.config.json  fallback de SPA, cache e cabeçalhos de segurança da Azure
-├── package.json              dependências só do script de alertas por e-mail (o painel em si não usa)
+├── package.json              comandos e dependências auxiliares (o painel em si não usa)
 ├── api/
 │   ├── package.json          runtime Node da Azure Functions
 │   └── checklist-suggestions.js  função HTTP server-side para sugestões
@@ -83,7 +83,8 @@ painel-obrigacoes/
 │       ├── toast.js           notificações não-bloqueantes (substitui alert())
 │       └── confirmDialog.js   diálogo de confirmação (substitui confirm())
 ├── scripts/
-│   └── enviar-alertas.mjs    script Node — alertas diários por e-mail (roda via GitHub Actions)
+│   ├── enviar-alertas.mjs    aviso local do cutover para Lambda
+│   └── enviar-alertas-legacy-supabase.mjs  rollback manual, não agendado
 ├── .github/workflows/
 │   ├── azure-static-web-apps.yml  deploy do site e da API na Azure
 │   └── alertas-diarios.yml   execução manual do script de alertas
@@ -370,17 +371,18 @@ Aba "Visão Executiva" (admin), `js/ui/dashboard.js` — calculada inteiramente 
 
 ## Alertas diários por e-mail
 
-Roda **fora do navegador**, via `scripts/enviar-alertas.mjs` (Node) agendado pelo GitHub Actions (`.github/workflows/alertas-diarios.yml`, gratuito). O script:
+Após o cutover, o EventBridge Scheduler invoca uma Lambda dedicada descrita em
+`aws/template.yaml`. Ela consulta cada workspace separadamente no DynamoDB,
+reutiliza sem alteração `scripts/alertas-core.mjs`, deduplica retries por dia e
+destinatário e envia pelo SES. Perfis inativos são ignorados; responsáveis e
+gestores mantêm os filtros de workspace/módulo, inclusive divergências OCR das
+últimas 24 horas. Métricas e logs estruturados registram apenas contagens e
+identificadores técnicos, sem e-mails ou nomes.
 
-1. Conecta no Supabase com a `service_role key` (que nunca aparece no front-end).
-2. Reaproveita as mesmas funções puras do painel (`getActiveOccurrence`, `statusOf` de `js/dateUtils.js`) para calcular o que está atrasado ou vencendo nos próximos N dias (padrão 5).
-3. Agrupa por `responsible_id` e manda um e-mail por pessoa via **Resend**, além de um resumo para admins e gestores do mesmo workspace. Gestores recebem somente os módulos liberados em seu perfil.
-4. Respeita ajustes manuais de data e inclui atividades sem responsável e divergências recentes de comprovante no resumo da gestão da empresa correspondente.
-5. Executa às 08h30 (America/Sao_Paulo), de segunda a sexta-feira, e também pode ser iniciado manualmente.
-
-**Design deliberadamente simples**: é um lembrete diário — a mesma pendência aparece de novo todo dia até ser concluída, sem tabela de "já avisei isso" para deduplicar. Mais fácil de entender e depurar do que um sistema de dedup, e o custo de receber o mesmo lembrete de novo é baixo. Configuração completa (criar conta na Resend, configurar os Secrets no GitHub) no `SETUP.md`.
-
-> O workflow só dispara o envio quando os quatro Secrets obrigatórios estão configurados. Sem eles, registra avisos e encerra com segurança, sem tentar enviar nem expor credenciais.
+O workflow homônimo não agenda nem envia: ele apenas executa os testes de
+equivalência Supabase/DynamoDB. O legado está em
+`scripts/enviar-alertas-legacy-supabase.mjs`, exclusivamente para rollback
+manual. Consulte `aws/README.md` para o cutover governado.
 
 ## Papéis de acesso (RLS)
 
@@ -526,10 +528,8 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
 - Conclusões registradas **antes** da mudança que tornou o comprovante
   obrigatório continuam existindo sem anexo — a regra nova não é
   retroativa (ver a constraint `NOT VALID` na seção de comprovantes).
-- Os alertas por e-mail rodam fora do navegador e não foram testados
-  contra uma conta real de e-mail nem contra um projeto Supabase de
-  produção — só com rede mockada. Teste manualmente (`workflow_dispatch`
-  no GitHub Actions) antes de confiar neles no dia a dia.
+- Os alertas por e-mail devem ser validados com destinatários controlados no
+  SES antes de habilitar `NotificationScheduleState`; esta alteração não faz deploy.
 - Não há testes automatizados no repositório (a suíte de testes usada
   durante o desenvolvimento foi manual, com um mock do Supabase, e não faz
   parte da entrega). Se o projeto crescer, vale considerar algo simples
