@@ -46,12 +46,13 @@ async function ensureCognitoUser(cognito, { userPoolId, email, userId, displayNa
     return { created: true };
   }
   const attributes = attributeMap(current.UserAttributes);
-  if (attributes['custom:legacy_user_id'] && attributes['custom:legacy_user_id'] !== userId) {
-    throw Object.assign(new Error('Conta Cognito vinculada a outro usuário.'), { statusCode: 409 });
-  }
   if (!attributes['custom:legacy_user_id']) {
     throw Object.assign(new Error('Conta existente não gerenciada pelo portal; use federação ou autenticação própria.'), { statusCode: 409 });
   }
+  // O identificador legado veio do Supabase, enquanto `userId` pertence ao
+  // Portal. Eles são namespaces diferentes e, portanto, não devem ser
+  // comparados. A presença do atributo imutável comprova que esta é uma conta
+  // criada pela migração; o e-mail verificado é o vínculo entre as identidades.
   const updates = [
     { Name: 'email_verified', Value: 'true' },
     { Name: 'name', Value: displayName },

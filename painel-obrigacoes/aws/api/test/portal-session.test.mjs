@@ -29,6 +29,30 @@ test('preserva a senha de usuário Cognito existente não gerenciado pelo portal
   assert.ok(!calls.includes('AdminSetUserPasswordCommand'));
 });
 
+test('aceita conta migrada cujo identificador legado difere do identificador do portal', async () => {
+  const cognitoCalls = [];
+  const cognito = { send: async (command) => {
+    cognitoCalls.push(command);
+    if (command.constructor.name === 'AdminGetUserCommand') {
+      return { UserAttributes: [{ Name: 'custom:legacy_user_id', Value: 'supabase-user-1' }] };
+    }
+    if (command.constructor.name === 'AdminUpdateUserAttributesCommand') return {};
+    if (command.constructor.name === 'AdminSetUserPasswordCommand') return {};
+    if (command.constructor.name === 'AdminInitiateAuthCommand') {
+      return { AuthenticationResult: { IdToken: 'id', AccessToken: 'access', RefreshToken: 'refresh' } };
+    }
+    assert.fail(`comando Cognito inesperado: ${command.constructor.name}`);
+  } };
+  const ddb = { send: async (command) => command.constructor.name === 'GetCommand' ? {} : {} };
+
+  const result = await createPortalSession(cognito, ddb, 'table', { userPoolId: 'pool', clientId: 'client' }, {
+    userId: 'portal-user-9', workspaceId: 'workspace-1', email: 'pessoa@empresa.com', displayName: 'Pessoa',
+  });
+
+  assert.equal(result.expiresIn, 60);
+  assert.ok(cognitoCalls.some(command => command.constructor.name === 'AdminSetUserPasswordCommand'));
+});
+
 test('troca refresh token de conta gerenciada sem redefinir sua senha', async () => {
   const cognitoCalls = [];
   const cognito = { send: async (command) => {

@@ -72,7 +72,13 @@ function validateInput(input) {
   if (!IDENTIFIER.test(userId) || !IDENTIFIER.test(workspaceId)) throw Object.assign(new Error('Identificadores inválidos.'), { statusCode: 400 });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw Object.assign(new Error('E-mail inválido.'), { statusCode: 400 });
   if (!displayName || displayName.length > 160 || !workspaceName || workspaceName.length > 180) throw Object.assign(new Error('Dados de acesso inválidos.'), { statusCode: 400 });
-  if (document.length < 11 || document.length > 14) throw Object.assign(new Error('Documento empresarial inválido.'), { statusCode: 400 });
+  // Organizações antigas do Portal podem não ter CPF/CNPJ preenchido. O
+  // documento é metadado cadastral, não credencial de autenticação, portanto
+  // não deve impedir a emissão da sessão SSO. Quando informado, ainda precisa
+  // ter um tamanho válido.
+  if (document && (document.length < 11 || document.length > 14)) {
+    throw Object.assign(new Error('Documento empresarial inválido.'), { statusCode: 400 });
+  }
   return { userId, workspaceId, email, displayName, workspaceName, document };
 }
 
