@@ -16,6 +16,20 @@ test('aceita somente provisionamento recente e assinado pelo Portal E3I', () => 
   assert.throws(() => verifyPortalProvisioning({ body, headers: { 'x-e3i-timestamp': String(now - 180_000), 'x-e3i-nonce': nonce, 'x-e3i-signature': signature } }, secret, now), /expirada/);
 });
 
+test('aceita timestamp Unix em segundos sem alterar o conteúdo assinado', () => {
+  const secret = 's'.repeat(32);
+  const now = 1_900_000_000_500;
+  const timestamp = '1900000000';
+  const nonce = 'n'.repeat(32);
+  const body = JSON.stringify({ userId: 'user-1' });
+  const signature = signPortalProvisioning(secret, timestamp, nonce, body);
+
+  assert.deepEqual(verifyPortalProvisioning({
+    body,
+    headers: { 'x-e3i-timestamp': timestamp, 'x-e3i-nonce': nonce, 'x-e3i-signature': signature },
+  }, secret, now), { nonce, timestampMs: 1_900_000_000_000 });
+});
+
 test('rejeita replay concorrente e persiste somente o hash do nonce com TTL', async () => {
   let claimed = false;
   let firstCommand;
