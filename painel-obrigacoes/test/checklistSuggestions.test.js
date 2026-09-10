@@ -45,6 +45,18 @@ test('recommender não mascara falha de autenticação como fallback local', asy
   );
 });
 
+test('recommender não mascara timeout ou indisponibilidade da validação de identidade', async () => {
+  for (const status of [503, 504]) {
+    await assert.rejects(
+      suggestChecklist(obligation, obligations, items, {
+        ...authenticated,
+        fetchImpl: async () => ({ ok: false, status }),
+      }),
+      (error) => error.authenticationFailure === true && error.status === status,
+    );
+  }
+});
+
 test('recommender prioritizes the exact Sankhya spreadsheet model when available', () => {
   const exact = { id: 'dctf', name: 'DCTFWeb', category: 'federal', frequency: 'mensal' };
   const result = localChecklistSuggestions(exact, [exact], []);

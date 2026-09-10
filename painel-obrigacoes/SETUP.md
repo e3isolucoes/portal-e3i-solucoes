@@ -287,7 +287,8 @@ conjunto.
 No recurso Static Web App, abra **Settings → Environment variables** (em alguns layouts, **Configuration**) e adicione para o ambiente de produção:
 
 - `AWS_API_BASE_URL`: URL pública do API Gateway AWS (sem `/v1`), usada pela
-  Function para validar identidade e membership em `GET /v1/me`;
+  Function para validar identidade, membership, workspace e acesso ao módulo no
+  endpoint dedicado `GET /v1/authorize/checklist-suggestions`;
 - `ALLOWED_ORIGINS`: origens permitidas, separadas por vírgula;
 - `OPENAI_API_KEY`: chave secreta da API OpenAI;
 - `ENABLE_SUPABASE_AUTH_FALLBACK`: deixe ausente ou `false`; use `true` somente

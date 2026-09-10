@@ -2,7 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { S3Client } from '@aws-sdk/client-s3';
 import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider';
-import { authenticate } from './auth.mjs';
+import { authenticate, requireModuleGrant } from './auth.mjs';
 import { createDownloadUrl, createUploadUrl } from './files.mjs';
 import { claimPortalProvisioningNonce, provisionPortalAccess, verifyPortalProvisioning } from './portal-provisioning.mjs';
 import { consumePortalSession, createPortalSession } from './portal-session.mjs';
@@ -88,6 +88,10 @@ export async function handleAuthenticatedRequest(event, auth, dependencies) {
     const path = (event.rawPath || event.path || '/').replace(/^\/v1\/?/, '');
     const repositoryDependency = dependencies.repository;
     const admin = dependencies.adminService || adminService;
+    if (method === 'GET' && path === 'authorize/checklist-suggestions') {
+      requireModuleGrant(auth, 'obrigacoes');
+      return response(200, { userId: auth.userId, workspaceId: auth.workspaceId }, event);
+    }
     if (method === 'GET' && path === 'admin/workspaces') return response(200, await admin.listWorkspaces(auth, listOptions(event)), event);
     if (method === 'POST' && path === 'admin/workspaces') return response(201, await admin.createWorkspace(auth, parseBody(event)), event);
     const workspaceMatch = path.match(/^admin\/workspaces\/([^/]+)$/);

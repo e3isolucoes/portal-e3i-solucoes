@@ -77,10 +77,12 @@ export async function suggestChecklist(obligation, obligations, checklistItems, 
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}`, 'x-workspace-id': workspaceId },
       body: JSON.stringify({ obligation: { id: obligation.id, name: obligation.name, category: obligation.category, frequency: obligation.frequency } }),
     });
-    if ([401, 403].includes(response.status)) {
-      throw Object.assign(new Error('Sua sessão ou acesso à empresa não é mais válido.'), { authenticationFailure: true, status: response.status });
+    if (!response.ok) {
+      const message = [401, 403].includes(response.status)
+        ? 'Sua sessão ou acesso à empresa não é mais válido.'
+        : 'Não foi possível validar sua sessão com segurança.';
+      throw Object.assign(new Error(message), { authenticationFailure: true, status: response.status });
     }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (!Array.isArray(data.suggestions) || !data.suggestions.length) throw new Error('Resposta vazia');
 

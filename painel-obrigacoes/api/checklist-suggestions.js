@@ -8,6 +8,8 @@ const TRUSTED_PAGES = [
 
 const MAX_BODY_BYTES = 16 * 1024;
 const AUTH_TIMEOUT_MS = 3500;
+const MAX_BEARER_LENGTH = 8192;
+const WORKSPACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 
 function allowedOrigin(request, env) {
   const origin = request.headers.get('origin');
@@ -36,7 +38,8 @@ const json = (request, env, status, body) => ({ status, jsonBody: body, headers:
 function bearerToken(request) {
   const authorization = request.headers.get('authorization') || '';
   const match = authorization.match(/^Bearer\s+(\S+)$/i);
-  return match?.[1] || null;
+  const token = match?.[1] || null;
+  return token && token.length <= MAX_BEARER_LENGTH ? token : null;
 }
 
 function authError(status, code) {
@@ -48,12 +51,14 @@ function isTimeout(error) {
 }
 
 async function authenticateWithAws(token, workspaceId, fetchImpl, env) {
-  if (!env.AWS_API_BASE_URL) throw authError(503, 'AWS_AUTH_NOT_CONFIGURED');
+  const apiBaseUrl = trustedHttpsBaseUrl(env.AWS_API_BASE_URL);
+  if (!apiBaseUrl) throw authError(503, 'AWS_AUTH_NOT_CONFIGURED');
   let response;
   try {
-    response = await fetchImpl(`${env.AWS_API_BASE_URL.replace(/\/$/, '')}/v1/me`, {
+    response = await fetchImpl(`${apiBaseUrl}/v1/authorize/checklist-suggestions`, {
       headers: { Authorization: `Bearer ${token}`, 'x-workspace-id': workspaceId },
       signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+      redirect: 'error',
     });
   } catch (error) {
     throw authError(isTimeout(error) ? 504 : 503, isTimeout(error) ? 'AWS_AUTH_TIMEOUT' : 'AWS_AUTH_UNAVAILABLE');
@@ -69,14 +74,15 @@ async function authenticateWithAws(token, workspaceId, fetchImpl, env) {
 
 async function authenticateWithLegacySupabase(token, workspaceId, fetchImpl, env) {
   if (env.ENABLE_SUPABASE_AUTH_FALLBACK !== 'true') throw authError(401, 'INVALID_TOKEN');
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) throw authError(503, 'LEGACY_AUTH_NOT_CONFIGURED');
-  const baseUrl = env.SUPABASE_URL.replace(/\/$/, '');
+  const baseUrl = trustedHttpsBaseUrl(env.SUPABASE_URL);
+  if (!baseUrl || !env.SUPABASE_ANON_KEY) throw authError(503, 'LEGACY_AUTH_NOT_CONFIGURED');
   const headers = { Authorization: `Bearer ${token}`, apikey: env.SUPABASE_ANON_KEY };
   let userResponse;
   try {
     userResponse = await fetchImpl(`${baseUrl}/auth/v1/user`, {
       headers,
       signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+      redirect: 'error',
     });
   } catch (error) {
     throw authError(isTimeout(error) ? 504 : 503, 'LEGACY_AUTH_UNAVAILABLE');
@@ -91,10 +97,16 @@ async function authenticateWithLegacySupabase(token, workspaceId, fetchImpl, env
   const membershipResponse = await fetchImpl(`${baseUrl}/rest/v1/profiles?${query}`, {
     headers,
     signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+    redirect: 'error',
   }).catch((error) => { throw authError(isTimeout(error) ? 504 : 503, 'LEGACY_AUTH_UNAVAILABLE'); });
-  if (!membershipResponse.ok) throw authError(membershipResponse.status === 401 ? 401 : 403, 'INVALID_WORKSPACE');
+  if (!membershipResponse.ok) {
+    if (membershipResponse.status === 401) throw authError(401, 'INVALID_TOKEN');
+    if (membershipResponse.status === 403) throw authError(403, 'INVALID_WORKSPACE');
+    throw authError(503, 'LEGACY_AUTH_UNAVAILABLE');
+  }
   const memberships = await membershipResponse.json().catch(() => []);
-  if (!Array.isArray(memberships) || memberships.length !== 1 || memberships[0].workspace_id !== workspaceId) {
+  if (!Array.isArray(memberships) || memberships.length !== 1
+    || memberships[0].workspace_id !== workspaceId || memberships[0].active !== true) {
     throw authError(403, 'INVALID_WORKSPACE');
   }
   return { userId: user.id, workspaceId };
@@ -104,7 +116,7 @@ async function authenticate(request, fetchImpl, env) {
   const token = bearerToken(request);
   if (!token) throw authError(401, 'MISSING_TOKEN');
   const workspaceId = request.headers.get('x-workspace-id');
-  if (!workspaceId || workspaceId.length > 128) throw authError(403, 'INVALID_WORKSPACE');
+  if (!WORKSPACE_ID_PATTERN.test(workspaceId || '')) throw authError(403, 'INVALID_WORKSPACE');
   try {
     return await authenticateWithAws(token, workspaceId, fetchImpl, env);
   } catch (error) {
@@ -116,6 +128,14 @@ async function authenticate(request, fetchImpl, env) {
       || env.ENABLE_SUPABASE_AUTH_FALLBACK !== 'true') throw error;
     return authenticateWithLegacySupabase(token, workspaceId, fetchImpl, env);
   }
+}
+
+function trustedHttpsBaseUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return null;
+    return url.href.replace(/\/$/, '');
+  } catch { return null; }
 }
 
 const cleanText = (html) => html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s+/g, ' ').trim().slice(0, 12000);
@@ -152,6 +172,13 @@ export function createChecklistSuggestions({ fetchImpl = fetch, env = process.en
     if (request.method === 'OPTIONS') return { status: 204, headers: securityHeaders(request, env) };
     if (request.method !== 'POST') return json(request, env, 405, { error: 'Método não permitido' });
 
+    const contentLengthHeader = request.headers.get('content-length');
+    if (contentLengthHeader && !/^\d+$/.test(contentLengthHeader)) return json(request, env, 400, { error: 'Content-Length inválido' });
+    const contentLength = Number(contentLengthHeader || 0);
+    if (!Number.isSafeInteger(contentLength) || contentLength > MAX_BODY_BYTES) {
+      return json(request, env, 413, { error: 'Requisição muito grande' });
+    }
+
     try {
       await authenticate(request, fetchImpl, env);
     } catch (error) {
@@ -160,8 +187,6 @@ export function createChecklistSuggestions({ fetchImpl = fetch, env = process.en
       return json(request, env, status, { error: messages[status] || 'Serviço de identidade indisponível' });
     }
 
-    const contentLength = Number(request.headers.get('content-length') || 0);
-    if (contentLength > MAX_BODY_BYTES) return json(request, env, 413, { error: 'Requisição muito grande' });
     let body;
     try { body = await request.json(); } catch { return json(request, env, 400, { error: 'JSON inválido' }); }
     if (Buffer.byteLength(JSON.stringify(body), 'utf8') > MAX_BODY_BYTES) return json(request, env, 413, { error: 'Requisição muito grande' });

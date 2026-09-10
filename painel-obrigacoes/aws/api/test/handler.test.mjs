@@ -40,6 +40,24 @@ test('DELETE inexistente responde 204 conforme contrato idempotente', async () =
   assert.equal(result.body, '');
 });
 
+test('autoriza sugestões somente para membership com acesso ao módulo de obrigações', async () => {
+  const repository = { get: async () => assert.fail('não deveria consultar o repositório') };
+  const granted = await handleAuthenticatedRequest(
+    event('GET', 'authorize/checklist-suggestions'),
+    { ...auth, moduleGrants: ['obrigacoes'] },
+    { repository },
+  );
+  assert.equal(granted.statusCode, 200);
+  assert.deepEqual(JSON.parse(granted.body), { userId: 'user-a', workspaceId: 'empresa-a' });
+
+  const denied = await handleAuthenticatedRequest(
+    event('GET', 'authorize/checklist-suggestions'),
+    { ...auth, moduleGrants: ['dashboard'] },
+    { repository },
+  );
+  assert.equal(denied.statusCode, 403);
+});
+
 test('handler repassa somente o workspace autenticado ao repositório', async () => {
   const calls = [];
   const repository = {
