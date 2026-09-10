@@ -7,7 +7,7 @@ const execute = process.argv.includes('--execute');
 const table = process.env.DYNAMODB_TABLE;
 const userPoolId = process.env.COGNITO_USER_POOL_ID;
 if (!table || !userPoolId) throw new Error('DYNAMODB_TABLE e COGNITO_USER_POOL_ID são obrigatórios.');
-const dynamo = documentClient();
+const dynamo = await documentClient();
 const cognito = new CognitoIdentityProviderClient({});
 let ExclusiveStartKey; const profiles = [];
 do {

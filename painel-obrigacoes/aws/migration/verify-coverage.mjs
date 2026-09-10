@@ -2,7 +2,7 @@ import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { documentClient, enrichRows, entities, fetchAll, requiredEnv, tenantPk, toItem } from './shared.mjs';
 
 const config = requiredEnv();
-const client = documentClient();
+const client = await documentClient();
 const fetched = {};
 for (const entity of Object.keys(entities)) fetched[entity] = await fetchAll(config, entity);
 const rows = enrichRows(fetched);

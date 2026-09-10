@@ -1,6 +1,3 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { BatchWriteCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-
 export const entities = Object.freeze({
   workspaces: 'WORKSPACE_META', profiles: 'PROFILE', companies: 'COMPANY', obligations: 'OBLIGATION',
   completions: 'COMPLETION', obligation_comments: 'COMMENT', audit_log: 'AUDIT', holidays: 'HOLIDAY',
@@ -22,7 +19,7 @@ export async function fetchAll(config, table) {
   const rows = []; const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     const response = await fetch(`${config.supabaseUrl}/rest/v1/${table}?select=*`, { headers: { apikey: config.serviceKey, authorization: `Bearer ${config.serviceKey}`, range: `${from}-${from + pageSize - 1}`, prefer: 'count=exact' } });
-    if (!response.ok) throw new Error(`${table}: Supabase respondeu ${response.status} ${await response.text()}`);
+    if (!response.ok) throw new Error(`${table}: Supabase respondeu HTTP ${response.status}`);
     const page = await response.json(); rows.push(...page);
     if (page.length < pageSize) return rows;
   }
@@ -76,29 +73,13 @@ export function enrichRows(allRows) {
   };
 }
 
-export function documentClient() { return DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true, convertClassInstanceToMap: true } }); }
-
-export async function batchPut(client, table, items) {
-  const batchSize = Math.max(1, Math.min(25, Number(process.env.MIGRATION_BATCH_SIZE || 25)));
-  for (let offset = 0; offset < items.length; offset += batchSize) {
-    let pending = items.slice(offset, offset + batchSize).map((Item) => ({ PutRequest: { Item } }));
-    for (let attempt = 0; pending.length && attempt < 12; attempt += 1) {
-      try {
-        const result = await client.send(new BatchWriteCommand({ RequestItems: { [table]: pending } }));
-        pending = result.UnprocessedItems?.[table] || [];
-      } catch (error) {
-        if (error.name !== 'ProvisionedThroughputExceededException' && error.name !== 'ThrottlingException') throw error;
-      }
-      if (pending.length) {
-        const delay = Math.min(10000, (2 ** attempt * 100) + Math.floor(Math.random() * 250));
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-    if (pending.length) throw new Error(`${pending.length} itens não processados após novas tentativas.`);
-  }
+export async function documentClient() {
+  const [{ DynamoDBClient }, { DynamoDBDocumentClient }] = await Promise.all([import('@aws-sdk/client-dynamodb'), import('@aws-sdk/lib-dynamodb')]);
+  return DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true, convertClassInstanceToMap: true } });
 }
 
 export async function countPrefix(client, table, pk, prefix) {
+  const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
   let count = 0; let ExclusiveStartKey;
   do {
     const result = await client.send(new QueryCommand({ TableName: table, KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)', ExpressionAttributeValues: { ':pk': pk, ':sk': `${prefix}#` }, Select: 'COUNT', ExclusiveStartKey }));

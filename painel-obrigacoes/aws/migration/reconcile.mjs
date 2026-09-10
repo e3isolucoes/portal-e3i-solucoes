@@ -1,6 +1,6 @@
 import { administrationPk, countPrefix, documentClient, enrichRows, entities, fetchAll, membershipPk, requiredEnv, tenantPk } from './shared.mjs';
 
-const config = requiredEnv(); const client = documentClient();
+const config = requiredEnv(); const client = await documentClient();
 const fetched = {};
 for (const entity of Object.keys(entities)) fetched[entity] = await fetchAll(config, entity);
 const allRows = enrichRows(fetched);
