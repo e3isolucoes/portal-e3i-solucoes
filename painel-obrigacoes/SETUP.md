@@ -286,14 +286,24 @@ conjunto.
 
 No recurso Static Web App, abra **Settings → Environment variables** (em alguns layouts, **Configuration**) e adicione para o ambiente de produção:
 
-- `SUPABASE_URL`: URL do mesmo projeto Supabase usado pelo painel;
-- `SUPABASE_ANON_KEY`: chave pública (`anon`/publishable) usada pelo backend
-  exclusivamente para validar o bearer token recebido; nunca use `service_role`
-  neste campo;
+- `AWS_API_BASE_URL`: URL pública do API Gateway AWS (sem `/v1`), usada pela
+  Function para validar identidade e membership em `GET /v1/me`;
+- `ALLOWED_ORIGINS`: origens permitidas, separadas por vírgula;
 - `OPENAI_API_KEY`: chave secreta da API OpenAI;
+- `ENABLE_SUPABASE_AUTH_FALLBACK`: deixe ausente ou `false`; use `true` somente
+  durante rollback explícito, junto de `SUPABASE_URL` e
+  `SUPABASE_ANON_KEY`. Nesse modo temporário, a associação ainda é confirmada
+  pela RLS de `profiles` antes de qualquer chamada ao provedor de IA;
+- `SUPABASE_URL` e `SUPABASE_ANON_KEY`: configure apenas no rollback acima. A
+  chave deve ser pública (`anon`/publishable); nunca use `service_role`;
 - `OPENAI_MODEL`: modelo permitido pela conta, por exemplo `gpt-5-mini`.
 
-Salve e aguarde a reinicialização. Esses valores pertencem à configuração do backend gerenciado e **não** devem ser adicionados ao GitHub, `js/config.js` ou a qualquer arquivo servido ao navegador. Se a API for posteriormente vinculada a uma Function App separada, cadastre os mesmos nomes em **Function App → Settings → Environment variables**. Sem `OPENAI_API_KEY`, o endpoint retorna o modelo operacional seguro como fallback.
+Salve e aguarde a reinicialização. Esses valores pertencem exclusivamente aos
+**Azure Application Settings** do backend e **não** devem ser adicionados ao
+GitHub, `js/config.js` ou a qualquer arquivo servido ao navegador. Se a API for
+posteriormente vinculada a uma Function App separada, cadastre os mesmos nomes
+em **Function App → Settings → Environment variables**. Sem `OPENAI_API_KEY`, o
+endpoint retorna o modelo operacional seguro como fallback.
 
 ### Configurar URLs de autenticação no Supabase
 
