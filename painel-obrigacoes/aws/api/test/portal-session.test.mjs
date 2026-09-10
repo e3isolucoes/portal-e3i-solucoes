@@ -15,18 +15,33 @@ test('rejeita código malformado antes de consultar a tabela', async () => {
   await assert.rejects(() => consumePortalSession(client, 'table', 'curto'), /Código de acesso inválido/);
 });
 
-test('preserva a senha de usuário Cognito existente não gerenciado pelo portal', async () => {
+test('adota conta Cognito anterior à migração usando o e-mail validado pelo portal', async () => {
   const calls = [];
   const cognito = { send: async (command) => {
-    calls.push(command.constructor.name);
-    return { UserAttributes: [{ Name: 'email', Value: 'pessoa@empresa.com' }] };
+    calls.push(command);
+    if (command.constructor.name === 'AdminGetUserCommand') {
+      return { UserAttributes: [{ Name: 'email', Value: 'pessoa@empresa.com' }] };
+    }
+    if (command.constructor.name === 'AdminUpdateUserAttributesCommand') return {};
+    if (command.constructor.name === 'AdminSetUserPasswordCommand') return {};
+    if (command.constructor.name === 'AdminInitiateAuthCommand') {
+      return { AuthenticationResult: { IdToken: 'id', AccessToken: 'access', RefreshToken: 'refresh' } };
+    }
+    assert.fail(`comando Cognito inesperado: ${command.constructor.name}`);
   } };
-  const ddb = { send: async () => assert.fail('não deveria consultar o DynamoDB') };
-  await assert.rejects(() => createPortalSession(cognito, ddb, 'table', { userPoolId: 'pool', clientId: 'client' }, {
+  const ddb = { send: async (command) => command.constructor.name === 'GetCommand' ? {} : {} };
+
+  const result = await createPortalSession(cognito, ddb, 'table', { userPoolId: 'pool', clientId: 'client' }, {
     userId: 'user-1', workspaceId: 'workspace-1', email: 'pessoa@empresa.com', displayName: 'Pessoa',
-  }), error => error.statusCode === 409 && /não gerenciada/.test(error.message));
-  assert.deepEqual(calls, ['AdminGetUserCommand']);
-  assert.ok(!calls.includes('AdminSetUserPasswordCommand'));
+  });
+
+  assert.equal(result.expiresIn, 60);
+  assert.deepEqual(calls.map(command => command.constructor.name), [
+    'AdminGetUserCommand',
+    'AdminUpdateUserAttributesCommand',
+    'AdminSetUserPasswordCommand',
+    'AdminInitiateAuthCommand',
+  ]);
 });
 
 test('aceita conta migrada cujo identificador legado difere do identificador do portal', async () => {
