@@ -54,8 +54,21 @@ test('provisiona vínculo, perfil, empresa e auditoria sem sobrescrever papéis 
     displayName: 'Pessoa Teste', workspaceName: 'Empresa Teste', document: '12.345.678/0001-90',
   });
   assert.deepEqual(result, { userId: 'user-1', workspaceId: 'workspace-1', role: 'member' });
-  assert.equal(command.input.TransactItems.length, 4);
+  assert.equal(command.input.TransactItems.length, 5);
   assert.match(command.input.TransactItems[0].Update.UpdateExpression, /if_not_exists\(#role,:member\)/);
-  assert.match(command.input.TransactItems[1].Update.UpdateExpression, /if_not_exists\(#role,:legacyMember\)/);
-  assert.equal(command.input.TransactItems[3].Put.Item.action, 'PORTAL_ACCESS_PROVISIONED');
+  assert.match(command.input.TransactItems[2].Update.UpdateExpression, /if_not_exists\(#role,:legacyMember\)/);
+  assert.equal(command.input.TransactItems[4].Put.Item.action, 'PORTAL_ACCESS_PROVISIONED');
+});
+
+test('permite SSO de organização antiga sem documento cadastrado', async () => {
+  let command;
+  const client = { send: async (value) => { command = value; } };
+
+  const result = await provisionPortalAccess(client, 'table', {
+    userId: 'user-1', workspaceId: 'workspace-1', email: 'pessoa@empresa.com.br',
+    displayName: 'Pessoa Teste', workspaceName: 'Empresa antiga',
+  });
+
+  assert.deepEqual(result, { userId: 'user-1', workspaceId: 'workspace-1', role: 'member' });
+  assert.equal(command.input.TransactItems[1].Update.ExpressionAttributeValues[':document'], '');
 });
