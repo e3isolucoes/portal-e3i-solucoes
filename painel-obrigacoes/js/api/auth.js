@@ -122,10 +122,10 @@ export function setSession(tokens) {
 function readStoredSession() { return memorySession; }
 
 export async function readPortalSsoResponse(response) {
-  const contentType = String(response.headers?.get?.('content-type') || '').toLowerCase();
+  const contentType = String(response.headers?.get('content-type') || '').toLowerCase();
   let body = {};
   if (contentType.includes('application/json')) {
-    body = await response.json().catch(() => ({}));
+    body = (await response.json().catch(() => ({}))) || {};
   }
   if (response.ok) return body;
   const unavailable = [502, 503, 504].includes(response.status);

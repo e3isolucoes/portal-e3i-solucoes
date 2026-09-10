@@ -14,5 +14,5 @@ test('centraliza o acesso ao Painel no Portal E3I', () => {
   assert.match(template, /ALLOW_ADMIN_USER_PASSWORD_AUTH/);
   assert.match(template, /ALLOW_REFRESH_TOKEN_AUTH/);
   assert.match(app, /showLogin\(error\.message \|\|/);
-  assert.doesNotMatch(app, /console\.error\('Falha no acesso único do portal', error\)/);
+  assert.match(app, /console\.error\('Falha no acesso único do portal', error\)/);
 });

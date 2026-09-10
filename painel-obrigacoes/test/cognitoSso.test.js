@@ -132,3 +132,17 @@ test('preserva mensagem e request ID de erro JSON na troca do SSO', async () => 
     error.status === 401 && error.requestId === 'request-1' && error.message === 'Código expirado.'
   ));
 });
+
+test('trata body JSON nulo como objeto vazio na troca do SSO', async () => {
+  const { readPortalSsoResponse } = await import('../js/api/auth.js');
+  const response = {
+    ok: false,
+    status: 401,
+    headers: { get: name => name === 'content-type' ? 'application/json' : null },
+    json: async () => null,
+  };
+
+  await assert.rejects(() => readPortalSsoResponse(response), error => (
+    error.status === 401 && error.requestId === null && error.message === 'Código de acesso inválido ou expirado.'
+  ));
+});
