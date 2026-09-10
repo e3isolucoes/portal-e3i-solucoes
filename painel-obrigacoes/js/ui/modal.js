@@ -5,7 +5,7 @@ import {
 import { escapeHtml } from '../dateUtils.js';
 import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
 import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js';
-import { suggestChecklist } from '../checklistSuggestions.js?v=20260908-csp-wasm-v2';
+import { suggestChecklist } from '../checklistSuggestions.js?v=20260910-cognito-auth-v1';
 
 let onSavedCallback = null;
 
@@ -346,7 +346,15 @@ async function wireChecklist(obligation) {
     suggestBtn.textContent = 'Analisando…';
     suggestionsEl.hidden = false;
     suggestionsEl.innerHTML = '<p class="comments-loading">Consultando histórico e fontes disponíveis…</p>';
-    const result = await suggestChecklist(obligation, STATE.obligations, STATE.checklistItems);
+    let result;
+    try {
+      result = await suggestChecklist(obligation, STATE.obligations, STATE.checklistItems);
+    } catch {
+      suggestionsEl.innerHTML = '<p class="comments-empty">Sua sessão ou acesso à empresa expirou. Entre novamente antes de solicitar sugestões.</p>';
+      suggestBtn.disabled = false;
+      suggestBtn.textContent = 'Sugerir novamente';
+      return;
+    }
     const current = await doLoadChecklist(obligationId);
     const existingDescriptions = new Set(current.map((item) => item.description.trim().toLowerCase()));
     const available = result.suggestions.filter((item) => !existingDescriptions.has(item.description.trim().toLowerCase()));
