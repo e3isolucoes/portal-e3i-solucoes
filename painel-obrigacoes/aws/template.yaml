@@ -400,8 +400,22 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: [dynamodb:DescribeTable, dynamodb:Scan, dynamodb:Query, dynamodb:PutItem, dynamodb:UpdateItem]
+                Action: dynamodb:DescribeTable
                 Resource: !GetAtt DataTable.Arn
+              - Effect: Allow
+                Action: dynamodb:Query
+                Resource: !GetAtt DataTable.Arn
+                Condition:
+                  ForAnyValue:StringLike:
+                    dynamodb:LeadingKeys:
+                      - !Sub TOOL#${ToolId}#ENV#${Environment}#ADMINISTRATION
+                      - !Sub TOOL#${ToolId}#ENV#${Environment}#WORKSPACE#*
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:UpdateItem]
+                Resource: !GetAtt DataTable.Arn
+                Condition:
+                  ForAllValues:StringLike:
+                    dynamodb:LeadingKeys: [NOTIFICATION#*]
               - Effect: Allow
                 Action: [ses:SendEmail]
                 Resource:
