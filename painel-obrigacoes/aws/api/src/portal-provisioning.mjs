@@ -28,7 +28,13 @@ export function verifyPortalProvisioning(event, secret, now = Date.now()) {
   const timestamp = header(event.headers, 'x-e3i-timestamp');
   const nonce = header(event.headers, 'x-e3i-nonce') || header(event.headers, 'x-request-id');
   const signature = header(event.headers, 'x-e3i-signature');
-  const timestampMs = Number(timestamp);
+  const numericTimestamp = Number(timestamp);
+  // Integrações HTTP normalmente transmitem Unix time em segundos, enquanto
+  // versões anteriores do Portal enviavam Date.now() em milissegundos. Aceite
+  // ambos sem alterar o valor usado na assinatura HMAC.
+  const timestampMs = numericTimestamp > 0 && numericTimestamp < 10_000_000_000
+    ? numericTimestamp * 1000
+    : numericTimestamp;
   if (!Number.isFinite(timestampMs) || Math.abs(now - timestampMs) > MAX_CLOCK_SKEW_MS) {
     throw Object.assign(new Error('Solicitação de acesso expirada.'), { statusCode: 401 });
   }
