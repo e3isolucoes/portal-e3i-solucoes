@@ -22,14 +22,9 @@ function codeKey(code) {
   return { PK: `PORTAL_SESSION#${digest}`, SK: `PORTAL_SESSION#${digest}` };
 }
 
-function attributeMap(attributes = []) {
-  return Object.fromEntries(attributes.map(({ Name, Value }) => [Name, Value]));
-}
-
 async function ensureCognitoUser(cognito, { userPoolId, email, userId, displayName }) {
-  let current;
   try {
-    current = await cognito.send(new AdminGetUserCommand({ UserPoolId: userPoolId, Username: email }));
+    await cognito.send(new AdminGetUserCommand({ UserPoolId: userPoolId, Username: email }));
   } catch (error) {
     if (error?.name !== 'UserNotFoundException') throw error;
     await cognito.send(new AdminCreateUserCommand({
@@ -45,19 +40,29 @@ async function ensureCognitoUser(cognito, { userPoolId, email, userId, displayNa
     }));
     return { created: true };
   }
-  const attributes = attributeMap(current.UserAttributes);
-  if (attributes['custom:legacy_user_id'] && attributes['custom:legacy_user_id'] !== userId) {
-    throw Object.assign(new Error('Conta Cognito vinculada a outro usuário.'), { statusCode: 409 });
-  }
-  if (!attributes['custom:legacy_user_id']) {
-    throw Object.assign(new Error('Conta existente não gerenciada pelo portal; use federação ou autenticação própria.'), { statusCode: 409 });
-  }
+  // O identificador legado veio do Supabase, enquanto `userId` pertence ao
+  // Portal. Eles são namespaces diferentes e, portanto, não devem ser
+  // comparados. Contas que já existiam no Cognito quando a migração rodou
+  // foram apenas ignoradas pelo migrador antigo e não receberam o atributo
+  // imutável. A requisição HMAC do Portal e o e-mail normalizado fazem o
+  // vínculo sem tentar modificar esse atributo depois da criação.
   const updates = [
     { Name: 'email_verified', Value: 'true' },
     { Name: 'name', Value: displayName },
   ];
   await cognito.send(new AdminUpdateUserAttributesCommand({ UserPoolId: userPoolId, Username: email, UserAttributes: updates }));
   return { created: false };
+}
+
+async function authenticateWithManagedPassword(cognito, { userPoolId, clientId, email }) {
+  const password = `A1!${randomBytes(32).toString('base64url')}`;
+  await cognito.send(new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId, Username: email, Password: password, Permanent: true,
+  }));
+  return cognito.send(new AdminInitiateAuthCommand({
+    UserPoolId: userPoolId, ClientId: clientId, AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+    AuthParameters: { USERNAME: email, PASSWORD: password },
+  }));
 }
 
 export async function createPortalSession(cognito, documentClient, tableName, config, identity, now = Date.now()) {
@@ -69,19 +74,26 @@ export async function createPortalSession(cognito, documentClient, tableName, co
   }));
   let authenticated;
   if (storedCredential.Item?.refreshToken) {
-    authenticated = await cognito.send(new AdminInitiateAuthCommand({
-      UserPoolId: userPoolId, ClientId: clientId, AuthFlow: 'REFRESH_TOKEN_AUTH',
-      AuthParameters: { REFRESH_TOKEN: storedCredential.Item.refreshToken },
-    }));
+    try {
+      authenticated = await cognito.send(new AdminInitiateAuthCommand({
+        UserPoolId: userPoolId, ClientId: clientId, AuthFlow: 'REFRESH_TOKEN_AUTH',
+        AuthParameters: { REFRESH_TOKEN: storedCredential.Item.refreshToken },
+      }));
+    } catch (error) {
+      // Tokens de atualização do Cognito expiram ou podem ser revogados. Como a
+      // conta foi validada acima como gerenciada pelo Portal, recupere somente
+      // esse caso em vez de transformar todo acesso futuro à ferramenta em 502.
+      if (error?.name !== 'NotAuthorizedException') throw error;
+      authenticated = await authenticateWithManagedPassword(cognito, {
+        userPoolId, clientId, email: identity.email,
+      });
+    }
   } else {
     // Newly provisioned users (and a one-time migration of legacy portal-managed users)
     // receive a random credential. Subsequent accesses exchange the refresh token instead.
-    const password = `A1!${randomBytes(32).toString('base64url')}`;
-    await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId: userPoolId, Username: identity.email, Password: password, Permanent: true }));
-    authenticated = await cognito.send(new AdminInitiateAuthCommand({
-      UserPoolId: userPoolId, ClientId: clientId, AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
-      AuthParameters: { USERNAME: identity.email, PASSWORD: password },
-    }));
+    authenticated = await authenticateWithManagedPassword(cognito, {
+      userPoolId, clientId, email: identity.email,
+    });
   }
   const tokens = authenticated.AuthenticationResult;
   if (!tokens?.IdToken || !tokens?.AccessToken) throw new Error('Cognito não emitiu a sessão esperada.');
