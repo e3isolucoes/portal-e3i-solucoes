@@ -22,10 +22,6 @@ function codeKey(code) {
   return { PK: `PORTAL_SESSION#${digest}`, SK: `PORTAL_SESSION#${digest}` };
 }
 
-function attributeMap(attributes = []) {
-  return Object.fromEntries(attributes.map(({ Name, Value }) => [Name, Value]));
-}
-
 async function ensureCognitoUser(cognito, { userPoolId, email, userId, displayName }) {
   let current;
   try {
@@ -45,14 +41,12 @@ async function ensureCognitoUser(cognito, { userPoolId, email, userId, displayNa
     }));
     return { created: true };
   }
-  const attributes = attributeMap(current.UserAttributes);
-  if (!attributes['custom:legacy_user_id']) {
-    throw Object.assign(new Error('Conta existente não gerenciada pelo portal; use federação ou autenticação própria.'), { statusCode: 409 });
-  }
-  // O identificador legado veio do Supabase, enquanto `userId` pertence ao
-  // Portal. Eles são namespaces diferentes e, portanto, não devem ser
-  // comparados. A presença do atributo imutável comprova que esta é uma conta
-  // criada pela migração; o e-mail verificado é o vínculo entre as identidades.
+  // A chamada que chega aqui já foi autenticada pelo segredo de provisionamento
+  // do Portal e protegida contra replay. Contas criadas diretamente no Cognito
+  // antes da migração não possuem `custom:legacy_user_id`; rejeitá-las deixa o
+  // usuário preso em um 502 para sempre. O e-mail verificado pelo Portal é o
+  // vínculo canônico também para essas contas antigas. O atributo legado segue
+  // sendo somente metadado da migração, e não uma credencial de acesso.
   const updates = [
     { Name: 'email_verified', Value: 'true' },
     { Name: 'name', Value: displayName },
