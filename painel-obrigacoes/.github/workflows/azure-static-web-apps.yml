@@ -37,6 +37,17 @@ jobs:
       - name: Install AWS migration test dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
         working-directory: aws/migration
+      - name: Create safe test configuration
+        run: node scripts/write-public-config.mjs
+        env:
+          SUPABASE_URL: https://fsyginnpvonruifetjjs.supabase.co
+          # O gerador rejeita valor vazio. Este marcador não é uma credencial e
+          # impede que a validação dependa dos secrets do ambiente de deploy.
+          SUPABASE_ANON_KEY: public-ci-placeholder-not-a-secret
+      - name: Verify generated test configuration
+        run: |
+          test -s js/config.js
+          grep -Fq "public-ci-placeholder-not-a-secret" js/config.js
       - name: Run tests
         run: npm test
       - name: Run AWS migration tests
