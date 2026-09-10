@@ -27,7 +27,8 @@ autoriza execução em produção. Todos os comandos aceitam `--report <arquivo>
 5. `npm run verify-content -- --manifest .migration/snapshot-final.json`.
 6. `npm run verify-keys -- --manifest .migration/snapshot-final.json --cutover --extras-allowlist .migration/extras-allowlist.json`.
    A allowlist tem formato `{ "keys": [{ "PK": "...", "SK": "..." }] }`.
-7. `npm run verify-files` e `npm run report -- --manifest .migration/snapshot-final.json`.
+7. `npm run verify-files -- --manifest .migration/snapshot-final.json --report .migration/reports/files.json`.
+8. Gere a decisão agregada com `npm run report -- --manifest .migration/snapshot-final.json --apply-report .migration/reports/apply.json --content-report .migration/reports/verify-content.json --keys-report .migration/reports/verify-keys.json --files-report .migration/reports/files.json`.
 
 `apply` usa leitura consistente e escrita condicional por item, nunca BatchWrite.
 Um rerun idêntico é no-op. Update ou delete só prossegue quando o destino ainda
@@ -43,6 +44,10 @@ conflito explícito, sem sobrescrita.
 - **PASS `apply`:** `status=PASS`, `conflicts=[]`; deleções esperadas são zero ou
   foram aprovadas e executadas com `--apply-deletes`. **FAIL:** qualquer conflito,
   inclusive item do destino alterado depois da migração.
+- **PASS de identidade do manifesto:** `schemaVersion`, ferramenta e ambiente
+  coincidem com a execução, há um `executionId`, o hash global confere, todas as chaves são únicas e todo hash tem 64 dígitos
+  hexadecimais. **FAIL:** manifesto adulterado, incompleto, duplicado ou produzido
+  para outro ambiente; nenhum acesso ao target deve começar nesse caso.
 - **PASS `verify-content`:** `status=PASS`, `mismatches=[]` para 100% dos itens.
   Um byte/campo diferente, ausente ou adicional é **FAIL**.
 - **PASS `verify-keys --cutover`:** zero missing e zero extras fora da allowlist.
@@ -51,6 +56,9 @@ conflito explícito, sem sobrescrita.
   `membership`, perfis/workspaces administrativos e `tax_regime_rules` herdadas.
 - **PASS `verify-files`:** `matches=true`, `failed=[]` e `verified=source`.
   Hash, workspace ou completion divergente é **FAIL**.
+- **PASS `report`:** as quatro evidências pertencem ao mesmo `executionId` e
+  `apply`, `verify-content`, `verify-keys --cutover` e `verify-files` passaram.
+  Evidência ausente, de outra execução ou qualquer verificação falha é **FAIL**.
 - dois usuários de empresas distintas testados, sem leitura cruzada;
 - CRUD, anexar, visualizar, concluir, desfazer e excluir validados;
 - backup/exportação com hash e restauração testada em ambiente isolado;

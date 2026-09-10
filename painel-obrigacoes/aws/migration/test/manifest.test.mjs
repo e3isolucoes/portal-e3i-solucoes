@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildItems, canonicalJson, classifyExtras, classifyTarget, contentHash, createManifest, diffManifests } from '../manifest.mjs';
+import { buildItems, canonicalJson, classifyExtras, classifyTarget, contentHash, createManifest, cutoverChecks, diffManifests, validateManifest } from '../manifest.mjs';
 
 const config = { toolId: 'painel', appEnv: 'test' };
 const empty = () => ({ workspaces: [], profiles: [], companies: [], obligations: [], completions: [], obligation_comments: [], audit_log: [], holidays: [], checklist_items: [], obligation_rules: [], obligation_date_overrides: [], tax_regimes: [], tax_regime_rules: [], categories: [] });
@@ -52,4 +52,36 @@ test('extra é classificado e somente allowlist explícita o aprova', () => {
   const keys = ['P\u0000COMPANY#extra'];
   assert.equal(classifyExtras(keys, [])[0].classification, 'unapproved');
   assert.equal(classifyExtras(keys, [{ PK: 'P', SK: 'COMPANY#extra' }])[0].classification, 'allowlisted');
+});
+
+test('rejeita manifesto adulterado, duplicado ou de outro ambiente', () => {
+  const rows = empty(); rows.workspaces.push({ id: 'w1' });
+  const manifest = createManifest(config, buildItems(config, rows));
+  assert.equal(validateManifest(manifest, config), manifest);
+  assert.throws(() => validateManifest({ ...manifest, environment: 'prod' }, config), /outra ferramenta ou ambiente/);
+  assert.throws(() => validateManifest({ ...manifest, items: [{ ...manifest.items[0], contentHash: 'adulterado' }] }, config), /SHA-256 inválido/);
+  assert.throws(() => validateManifest({ ...manifest, items: [manifest.items[0], manifest.items[0]] }, config), /duplicada/);
+  const { workspace, ...withoutWorkspace } = manifest.items[0];
+  assert.throws(() => validateManifest({ ...manifest, items: [withoutWorkspace] }, config), /entrada incompleta/);
+  assert.throws(() => validateManifest({ ...manifest, label: 'adulterado' }, config), /hash global divergente/);
+});
+
+test('report só passa com todas as evidências da mesma execução', () => {
+  const id = 'execucao';
+  const manifest = { executionId: id, items: [{}, {}] };
+  const evidence = {
+    apply: { command: 'apply', status: 'PASS', executionId: id, conflicts: [], inserted: 1, updated: 0, unchanged: 1 },
+    content: { command: 'verify-content', status: 'PASS', executionId: id, checked: 2, mismatches: [] },
+    keys: { command: 'verify-keys', status: 'PASS', executionId: id, cutover: true, missing: 0, unapprovedExtras: 0 },
+    files: { command: 'verify-files', status: 'PASS', executionId: id, matches: true, source: 1, verified: 1, failed: [] }
+  };
+  assert.deepEqual(cutoverChecks(manifest, evidence), { apply: true, content: true, keys: true, files: true });
+  evidence.content.mismatches.push({ reason: 'content_mismatch' });
+  evidence.files.executionId = 'outra-execucao';
+  assert.equal(cutoverChecks(manifest, evidence).content, false);
+  assert.equal(cutoverChecks(manifest, evidence).files, false);
+  evidence.content.mismatches = []; evidence.content.checked = 0;
+  evidence.files.executionId = id; evidence.files.verified = 0;
+  assert.equal(cutoverChecks(manifest, evidence).content, false);
+  assert.equal(cutoverChecks(manifest, evidence).files, false);
 });

@@ -1,15 +1,25 @@
 import { createHash } from 'node:crypto';
 import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { fetchAll, requiredEnv } from './shared.mjs';
-import { writeJson } from './manifest.mjs';
+import { entities, fetchAll, requiredEnv } from './shared.mjs';
+import { buildItems, createManifest, diffManifests, readJson, validateManifest, writeJson } from './manifest.mjs';
 
 const config = requiredEnv();
+const manifestIndex = process.argv.indexOf('--manifest');
+if (manifestIndex < 0 || !process.argv[manifestIndex + 1]) throw new Error('verify-files exige --manifest <arquivo>.');
+const manifest = validateManifest(await readJson(process.argv[manifestIndex + 1]), config);
 const bucket = process.env.FILES_BUCKET;
 if (!bucket) throw new Error('FILES_BUCKET ausente.');
 const s3 = new S3Client({});
-const completions = await fetchAll(config, 'completions');
+const fetched = {};
+for (const entity of Object.keys(entities)) fetched[entity] = await fetchAll(config, entity);
+const liveManifest = createManifest(config, buildItems(config, fetched), 'verify-files-live-source');
+const drift = diffManifests(manifest, liveManifest);
+if (drift.inserted.length || drift.updated.length || drift.deleted.length) {
+  throw new Error(`Fonte divergiu do snapshot: ${drift.inserted.length} inserts, ${drift.updated.length} updates, ${drift.deleted.length} deletes.`);
+}
+const completions = fetched.completions;
 const files = completions.filter((row) => row.attachment_path && row.workspace_id);
-const report = { checkedAt: new Date().toISOString(), source: files.length, verified: 0, failed: [] };
+const report = { command: 'verify-files', executionId: manifest.executionId, checkedAt: new Date().toISOString(), source: files.length, verified: 0, failed: [] };
 
 for (const completion of files) {
   const sourcePath = String(completion.attachment_path).replace(/^\/+/, '');
@@ -31,6 +41,7 @@ for (const completion of files) {
 }
 
 report.matches = report.failed.length === 0 && report.verified === report.source;
+report.status = report.matches ? 'PASS' : 'FAIL';
 const reportIndex = process.argv.indexOf('--report');
 if (reportIndex >= 0 && process.argv[reportIndex + 1]) await writeJson(process.argv[reportIndex + 1], report);
 console.log(JSON.stringify(report, null, 2));

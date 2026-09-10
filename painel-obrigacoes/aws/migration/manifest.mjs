@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { administrationPk, enrichRows, entities, membershipItem, toItem } from './shared.mjs';
@@ -70,7 +70,38 @@ export function classifyTarget(existing, current, previous) {
 export function createManifest(config, built, label = 'snapshot') {
   const keys = built.map(({ manifest }) => keyOf(manifest.targetKey));
   if (new Set(keys).size !== keys.length) throw new Error('Manifesto inválido: target key duplicada.');
-  return { schemaVersion: 1, label, createdAt: new Date().toISOString(), toolId: config.toolId, environment: config.appEnv, items: built.map(({ manifest }) => manifest) };
+  const manifest = { schemaVersion: 1, executionId: randomUUID(), label, createdAt: new Date().toISOString(), toolId: config.toolId, environment: config.appEnv, items: built.map(({ manifest }) => manifest) };
+  return { ...manifest, manifestHash: createHash('sha256').update(canonicalJson(manifest)).digest('hex') };
+}
+
+export function validateManifest(manifest, config) {
+  if (!manifest || manifest.schemaVersion !== 1 || typeof manifest.executionId !== 'string'
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(manifest.executionId)
+    || typeof manifest.label !== 'string' || !Number.isFinite(Date.parse(manifest.createdAt))
+    || !/^[a-f0-9]{64}$/.test(manifest.manifestHash)
+    || !Array.isArray(manifest.items)) {
+    throw new Error('Manifesto inválido ou versão não suportada.');
+  }
+  if (manifest.toolId !== config.toolId || manifest.environment !== config.appEnv) {
+    throw new Error('Manifesto pertence a outra ferramenta ou ambiente.');
+  }
+  const keys = new Set();
+  const validEntities = new Set([...Object.keys(entities), 'membership', 'administrative_workspace']);
+  for (const item of manifest.items) {
+    if (!item || !validEntities.has(item.entity) || typeof item.sourceKey !== 'string'
+      || !Object.hasOwn(item, 'workspace') || (item.workspace !== null && typeof item.workspace !== 'string')
+      || !item.targetKey || typeof item.targetKey.PK !== 'string' || typeof item.targetKey.SK !== 'string'
+      || !/^[a-f0-9]{64}$/.test(item.contentHash)) {
+      throw new Error('Manifesto contém entrada incompleta ou hash SHA-256 inválido.');
+    }
+    const key = keyOf(item.targetKey);
+    if (keys.has(key)) throw new Error('Manifesto inválido: target key duplicada.');
+    keys.add(key);
+  }
+  const { manifestHash, ...unsigned } = manifest;
+  const expectedHash = createHash('sha256').update(canonicalJson(unsigned)).digest('hex');
+  if (manifestHash !== expectedHash) throw new Error('Manifesto adulterado: hash global divergente.');
+  return manifest;
 }
 
 export function classifyExtras(keys, allowlist) {
@@ -79,6 +110,17 @@ export function classifyExtras(keys, allowlist) {
     const [PK, SK] = key.split('\u0000');
     return { targetKey: { PK, SK }, entityPrefix: SK.split('#', 1)[0], classification: allowed.has(key) ? 'allowlisted' : 'unapproved' };
   });
+}
+
+export function cutoverChecks(manifest, evidence) {
+  const executionId = manifest.executionId;
+  const appliedCurrent = Number(evidence.apply?.inserted) + Number(evidence.apply?.updated) + Number(evidence.apply?.unchanged);
+  return {
+    apply: evidence.apply?.command === 'apply' && evidence.apply.status === 'PASS' && evidence.apply.executionId === executionId && evidence.apply.conflicts?.length === 0 && appliedCurrent === manifest.items.length,
+    content: evidence.content?.command === 'verify-content' && evidence.content.status === 'PASS' && evidence.content.executionId === executionId && evidence.content.mismatches?.length === 0 && evidence.content.checked === manifest.items.length,
+    keys: evidence.keys?.command === 'verify-keys' && evidence.keys.status === 'PASS' && evidence.keys.executionId === executionId && evidence.keys.cutover === true && evidence.keys.missing === 0 && evidence.keys.unapprovedExtras === 0,
+    files: evidence.files?.command === 'verify-files' && evidence.files.status === 'PASS' && evidence.files.executionId === executionId && evidence.files.matches === true && evidence.files.failed?.length === 0 && evidence.files.verified === evidence.files.source
+  };
 }
 
 export async function writeJson(path, value) {
