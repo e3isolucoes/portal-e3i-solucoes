@@ -9,6 +9,14 @@ on:
       - 'painel-obrigacoes/test/**'
       - 'painel-obrigacoes/package*.json'
       - '.github/workflows/aws-sam-staging.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'painel-obrigacoes/aws/**'
+      - 'painel-obrigacoes/api/**'
+      - 'painel-obrigacoes/test/**'
+      - 'painel-obrigacoes/package*.json'
+      - '.github/workflows/aws-sam-staging.yml'
   workflow_dispatch:
 
 concurrency:
@@ -48,17 +56,20 @@ jobs:
       - name: Install AWS migration dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
         working-directory: painel-obrigacoes/aws/migration
-      - name: Create safe test configuration
-        run: node scripts/write-public-config.mjs
-        env:
-          SUPABASE_URL: https://fsyginnpvonruifetjjs.supabase.co
-          SUPABASE_ANON_KEY: public-test-key-with-safe-length
       - name: Run automated checks
         run: |
           npm test
           corepack pnpm --dir aws/migration test
           npm run governance
           npm run typecheck
+      - name: Verify public configuration generator
+        run: |
+          node scripts/write-public-config.mjs
+          test -s js/config.js
+          grep -Fq "public-ci-placeholder-not-a-secret" js/config.js
+        env:
+          SUPABASE_URL: https://fsyginnpvonruifetjjs.supabase.co
+          SUPABASE_ANON_KEY: public-ci-placeholder-not-a-secret
       - name: Build AWS API bundle
         run: corepack pnpm --dir aws/api build
       - name: Validate SAM template
@@ -68,7 +79,9 @@ jobs:
 
   deploy:
     needs: validate
-    if: github.repository == 'e3isolucoes/portal-e3i-solucoes'
+    if: >-
+      github.repository == 'e3isolucoes/portal-e3i-solucoes' &&
+      github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: aws-staging
     steps:
