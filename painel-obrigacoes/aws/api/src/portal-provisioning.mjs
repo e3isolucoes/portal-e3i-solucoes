@@ -21,6 +21,21 @@ export function signPortalProvisioning(secret, timestamp, nonce, rawBody) {
   return createHmac('sha256', secret).update(`${timestamp}.${nonce}.${rawBody}`, 'utf8').digest('hex');
 }
 
+// Compatibilidade temporária com o Portal E3I implantado antes da proteção por
+// nonce. O contrato legado assinava apenas `timestamp.rawBody`. Quando essa
+// assinatura é aceita, derivamos um nonce determinístico do próprio request
+// assinado; assim o claim no DynamoDB continua bloqueando replay sem exigir que
+// o cliente antigo já envie o novo header.
+export function signLegacyPortalProvisioning(secret, timestamp, rawBody) {
+  return createHmac('sha256', secret).update(`${timestamp}.${rawBody}`, 'utf8').digest('hex');
+}
+
+function legacyReplayNonce(timestamp, signature, rawBody) {
+  return createHash('sha256')
+    .update(`legacy.${timestamp}.${signature}.${rawBody}`, 'utf8')
+    .digest('base64url');
+}
+
 export function verifyPortalProvisioning(event, secret, now = Date.now()) {
   if (!secret || secret.length < 32) {
     throw Object.assign(new Error('Integração do Portal E3I não configurada.'), { statusCode: 503 });
@@ -28,6 +43,7 @@ export function verifyPortalProvisioning(event, secret, now = Date.now()) {
   const timestamp = header(event.headers, 'x-e3i-timestamp');
   const nonce = header(event.headers, 'x-e3i-nonce') || header(event.headers, 'x-request-id');
   const signature = header(event.headers, 'x-e3i-signature');
+  const rawBody = event.body || '';
   const numericTimestamp = Number(timestamp);
   // Integrações HTTP normalmente transmitem Unix time em segundos, enquanto
   // versões anteriores do Portal enviavam Date.now() em milissegundos. Aceite
@@ -38,14 +54,32 @@ export function verifyPortalProvisioning(event, secret, now = Date.now()) {
   if (!Number.isFinite(timestampMs) || Math.abs(now - timestampMs) > MAX_CLOCK_SKEW_MS) {
     throw Object.assign(new Error('Solicitação de acesso expirada.'), { statusCode: 401 });
   }
+
+  if (NONCE_PATTERN.test(nonce)) {
+    const expected = signPortalProvisioning(secret, timestamp, nonce, rawBody);
+    if (!safeEqualHex(signature, expected)) {
+      throw Object.assign(new Error('Assinatura do Portal E3I inválida.'), { statusCode: 401 });
+    }
+    return { nonce, timestampMs };
+  }
+
+  // Compatibilidade de transição: versões já implantadas do Portal ainda usam
+  // a assinatura anterior e não enviam nonce. Mantemos HMAC + janela temporal e
+  // derivamos uma chave de replay determinística, preservando o bloqueio de
+  // repetição até o Portal ser atualizado para o contrato novo.
+  const legacyExpected = signLegacyPortalProvisioning(secret, timestamp, rawBody);
+  if (safeEqualHex(signature, legacyExpected)) {
+    return {
+      nonce: legacyReplayNonce(timestamp, signature, rawBody),
+      timestampMs,
+      legacy: true,
+    };
+  }
+
   if (!NONCE_PATTERN.test(nonce)) {
     throw Object.assign(new Error('Nonce criptográfico obrigatório ou inválido.'), { statusCode: 401 });
   }
-  const expected = signPortalProvisioning(secret, timestamp, nonce, event.body || '');
-  if (!safeEqualHex(signature, expected)) {
-    throw Object.assign(new Error('Assinatura do Portal E3I inválida.'), { statusCode: 401 });
-  }
-  return { nonce, timestampMs };
+  throw Object.assign(new Error('Assinatura do Portal E3I inválida.'), { statusCode: 401 });
 }
 
 export async function claimPortalProvisioningNonce(client, tableName, nonce, now = Date.now()) {
