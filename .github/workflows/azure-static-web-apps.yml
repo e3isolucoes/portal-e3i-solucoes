@@ -86,7 +86,7 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       - name: Require Azure token for production
-        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name == 'push'
         run: test -n "$AZURE_DEPLOY_TOKEN"
       - name: Deploy static app and API
         uses: Azure/static-web-apps-deploy@v1
@@ -98,7 +98,7 @@ jobs:
           api_location: painel-obrigacoes/api
           output_location: ''
           skip_app_build: true
-          skip_deploy_on_missing_secrets: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          skip_deploy_on_missing_secrets: true
 
   close_pull_request:
     if: >-

@@ -71,16 +71,8 @@ jobs:
     if: github.repository == 'e3isolucoes/portal-e3i-solucoes'
     runs-on: ubuntu-latest
     environment: aws-staging
-    env:
-      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
-      PORTAL_SECRET: ${{ secrets.PORTAL_PROVISIONING_SECRET }}
     steps:
       - uses: actions/checkout@v7
-      - name: Validate AWS connection configuration
-        shell: bash
-        run: |
-          test -n "$AWS_DEPLOY_ROLE_ARN"
-          test -n "$PORTAL_SECRET"
       - uses: aws-actions/setup-sam@v3
         with:
           use-installer: true
@@ -88,7 +80,7 @@ jobs:
       - name: Authenticate to AWS with GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
-          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
           role-session-name: github-painel-staging
           aws-region: sa-east-1
           allowed-account-ids: '181215701228'
@@ -112,7 +104,7 @@ jobs:
             --parameter-overrides \
               Environment=staging \
               AllowedOrigin=https://obrigacoes.e3isolucoes.com.br \
-              PortalProvisioningSecret="$PORTAL_SECRET" \
+              PortalProvisioningSecret=${{ secrets.PORTAL_PROVISIONING_SECRET }} \
               NotificationScheduleState=DISABLED
       - name: Enforce and verify API throttling
         shell: bash

@@ -200,34 +200,29 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 > Nunca cole a "service_role key" (essa sim é secreta) em nenhum arquivo
 > deste projeto.
 
-## 7. Repositório GitHub
+## 7. Guardar o projeto no GitHub (gratuito)
 
-O painel faz parte do monorepositório privado
-`e3isolucoes/portal-e3i-solucoes`, dentro de `painel-obrigacoes/`. Não crie um
-segundo repositório e não copie os workflows desta pasta: o GitHub executa os
-pipelines canônicos que ficam em `/.github/workflows/` na raiz do
-monorepositório.
+Diferente da versão anterior (um arquivo solto), agora vale a pena guardar
+a pasta inteira num repositório do GitHub — é o que permite a publicação
+automática do passo 8, e também guarda um histórico de tudo que foi
+alterado (então dá pra sempre voltar atrás se algo der errado).
 
-A branch de produção é `main`. Alterações devem entrar por pull request para
-que os testes, o preview Azure e as proteções de ambiente sejam aplicados antes
-do merge. Confirme em **Settings → Actions → General** que GitHub Actions está
-habilitado e em **Settings → Environments** que existem os ambientes
-`preview`, `production` e `aws-staging`. O ambiente `aws-staging` deve aceitar
-deploy somente de `main`; produção deve manter as aprovações exigidas pela
-organização.
+Se você nunca usou Git/GitHub, o caminho mais simples é:
 
-Para efetivar as duas conexões de uma vez, autentique `gh`, `az` e `aws` e rode
-o script idempotente a partir da raiz do monorepositório:
+1. Crie uma conta gratuita em **https://github.com**, se ainda não tiver.
+2. Clique em **New repository**, dê um nome (ex.: `painel-obrigacoes`),
+   deixe como **privado** (Private) — é um sistema interno da empresa — e
+   clique em **Create repository**.
+3. Na página do repositório recém-criado, use o botão **"uploading an
+   existing file"** (ou "Add file → Upload files") e arraste a pasta
+   inteira do projeto (todos os arquivos e subpastas: `index.html`, `css/`,
+   `js/`, `sql/`, os `.md`). O GitHub aceita arrastar pastas direto pelo
+   navegador, sem precisar instalar nada.
+4. Clique em **Commit changes** para confirmar o envio.
 
-```bash
-AZURE_RESOURCE_GROUP='<grupo>' \
-AZURE_STATIC_WEB_APP='<nome-do-recurso>' \
-./scripts/connect-github-clouds.sh
-```
-
-O script valida as três contas, configura os ambientes GitHub, publica a ARN da
-role OIDC AWS e transfere o token de implantação da Static Web App diretamente
-para os secrets `preview` e `production`, sem salvá-lo em arquivo.
+(Se alguém da equipe já usa Git pelo terminal, pode preferir `git init`,
+`git add .`, `git commit`, `git push` — o resultado final é o mesmo, só
+mais rápido para quem já tem o hábito.)
 
 ## 8. Publicar no Azure Static Web Apps
 
@@ -240,15 +235,10 @@ para os secrets `preview` e `production`, sem salvá-lo em arquivo.
    `.github/workflows/azure-static-web-apps.yml`; não permita que o portal crie
    um segundo workflow.
 4. Em **Build details**, escolha **Custom** e informe exatamente:
-   - **App location:** `/painel-obrigacoes`
-   - **API location:** `painel-obrigacoes/api`
+   - **App location:** `/`
+   - **API location:** `api`
    - **Output location:** deixe vazio
-5. Crie o recurso. Copie o token em **Manage deployment token** e cadastre-o no
-   ambiente `production` do GitHub, em **Settings → Environments → production →
-   Environment secrets**, com o nome `AZURE_STATIC_WEB_APPS_API_TOKEN`. Cadastre
-   o mesmo nome no ambiente `preview` para habilitar previews de pull requests.
-   O workflow `.github/workflows/azure-static-web-apps.yml` usa esse secret, não
-   executa build da interface e publica `painel-obrigacoes/` junto da API.
+5. Crie o recurso. Copie o token em **Manage deployment token** e cadastre-o no GitHub em **Settings → Secrets and variables → Actions** com o nome `AZURE_STATIC_WEB_APPS_API_TOKEN`. O workflow `.github/workflows/azure-static-web-apps.yml` usa esse secret, não executa build da interface e publica a raiz do repositório junto da API.
 6. Cadastre o token de implantação no secret
    `AZURE_STATIC_WEB_APPS_API_TOKEN`, faça merge em `main` e acompanhe
    **GitHub → Actions → Azure Static Web Apps CI/CD**. Ao terminar, abra a URL

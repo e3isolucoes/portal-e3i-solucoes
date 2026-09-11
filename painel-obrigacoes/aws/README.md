@@ -67,38 +67,6 @@ Pré-requisitos:
 4. variável do repositório `AWS_STAGING_DEPLOY_ROLE_ARN` com a ARN da função;
 5. agendamento de notificações mantido `DISABLED` até a validação do SES.
 
-### Conectar o repositório à conta AWS
-
-Execute o bootstrap uma única vez com uma sessão administrativa temporária. O
-template cria a role de menor privilégio usada pelo GitHub; ele não cria access
-keys. Se o provedor OIDC do GitHub ainda não existir na conta, crie-o antes com
-URL `https://token.actions.githubusercontent.com` e audiência
-`sts.amazonaws.com`.
-
-```bash
-ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-aws cloudformation deploy \
-  --stack-name e3i-github-staging-deployer \
-  --template-file aws/bootstrap/deployer.yaml \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides AccountId="$ACCOUNT_ID"
-
-ROLE_ARN="$(aws cloudformation describe-stacks \
-  --stack-name e3i-github-staging-deployer \
-  --query "Stacks[0].Outputs[?OutputKey=='RoleArn'].OutputValue" \
-  --output text)"
-gh variable set AWS_STAGING_DEPLOY_ROLE_ARN \
-  --repo e3isolucoes/portal-e3i-solucoes \
-  --env aws-staging \
-  --body "$ROLE_ARN"
-```
-
-Cadastre também `PORTAL_PROVISIONING_SECRET` como **environment secret** de
-`aws-staging`; nunca o grave em arquivo ou como variável não secreta. Depois,
-execute manualmente `AWS SAM Staging` no GitHub e confira no resumo do job a
-stack, a região, a URL da API e o commit implantado. O subject OIDC do template
-restringe a sessão ao repositório e ao ambiente esperados.
-
 O deploy usa `cancel-in-progress: false` para nunca interromper uma atualização
 CloudFormation em andamento. Produção permanece fora deste workflow e exige um
 ambiente, função IAM e aprovação separados.
