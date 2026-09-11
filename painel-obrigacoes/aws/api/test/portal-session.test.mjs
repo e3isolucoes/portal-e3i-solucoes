@@ -44,6 +44,39 @@ test('adota conta Cognito anterior à migração usando o e-mail validado pelo p
   ]);
 });
 
+test('trata criação concorrente da conta Cognito como operação idempotente', async () => {
+  const calls = [];
+  const cognito = { send: async (command) => {
+    calls.push(command);
+    if (command.constructor.name === 'AdminGetUserCommand') {
+      throw Object.assign(new Error('User does not exist'), { name: 'UserNotFoundException' });
+    }
+    if (command.constructor.name === 'AdminCreateUserCommand') {
+      throw Object.assign(new Error('User already exists'), { name: 'UsernameExistsException' });
+    }
+    if (command.constructor.name === 'AdminUpdateUserAttributesCommand') return {};
+    if (command.constructor.name === 'AdminSetUserPasswordCommand') return {};
+    if (command.constructor.name === 'AdminInitiateAuthCommand') {
+      return { AuthenticationResult: { IdToken: 'id', AccessToken: 'access', RefreshToken: 'refresh' } };
+    }
+    assert.fail(`comando Cognito inesperado: ${command.constructor.name}`);
+  } };
+  const ddb = { send: async (command) => command.constructor.name === 'GetCommand' ? {} : {} };
+
+  const result = await createPortalSession(cognito, ddb, 'table', { userPoolId: 'pool', clientId: 'client' }, {
+    userId: 'user-1', workspaceId: 'workspace-1', email: 'pessoa@empresa.com', displayName: 'Pessoa',
+  });
+
+  assert.equal(result.expiresIn, 60);
+  assert.deepEqual(calls.map(command => command.constructor.name), [
+    'AdminGetUserCommand',
+    'AdminCreateUserCommand',
+    'AdminUpdateUserAttributesCommand',
+    'AdminSetUserPasswordCommand',
+    'AdminInitiateAuthCommand',
+  ]);
+});
+
 test('aceita conta migrada cujo identificador legado difere do identificador do portal', async () => {
   const cognitoCalls = [];
   const cognito = { send: async (command) => {
