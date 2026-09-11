@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 import test from 'node:test';
+
+const execFileAsync = promisify(execFile);
 
 test('CSP permits OCR eval while keeping script elements restricted to trusted origins', async () => {
   const config = JSON.parse(await readFile(new URL('../staticwebapp.config.json', import.meta.url), 'utf8'));
@@ -38,6 +45,30 @@ test('AWS panel keeps a safe public configuration module in the repository', asy
 
   assert.match(config, /SUPABASE_ANON_KEY = ''/);
   assert.doesNotMatch(ignore, /(?:^|\n)js\/config\.js(?:\n|$)/);
+});
+
+test('CI validates generated public configuration without changing the tracked module', async () => {
+  const trackedConfigUrl = new URL('../js/config.js', import.meta.url);
+  const original = await readFile(trackedConfigUrl, 'utf8');
+  const directory = await mkdtemp(join(tmpdir(), 'e3i-public-config-'));
+  const output = join(directory, 'config.js');
+
+  try {
+    await execFileAsync(process.execPath, ['scripts/write-public-config.mjs'], {
+      cwd: new URL('..', import.meta.url),
+      env: {
+        ...process.env,
+        PUBLIC_CONFIG_OUTPUT: output,
+        SUPABASE_URL: 'https://fsyginnpvonruifetjjs.supabase.co',
+        SUPABASE_ANON_KEY: 'public-ci-placeholder-not-a-secret',
+      },
+    });
+
+    assert.match(await readFile(output, 'utf8'), /public-ci-placeholder-not-a-secret/);
+    assert.equal(await readFile(trackedConfigUrl, 'utf8'), original);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('admin can complete an activity without a second validator', async () => {

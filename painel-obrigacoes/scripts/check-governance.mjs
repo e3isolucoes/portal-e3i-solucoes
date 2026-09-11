@@ -52,9 +52,11 @@ const retiredProviders = new RegExp(`\\b(?:${retiredProviderNames.join('|')})\\b
 // Bibliotecas de terceiros vendorizadas (ex.: vendor/supabase-*) legitimamente
 // fazem detecção de ambiente/runtime para outras plataformas de hospedagem
 // dentro do próprio SDK. Isso não indica que este projeto está hospedado
-// nelas, então essa checagem só se aplica a código próprio, não a vendor/.
+// nelas, então essa checagem só se aplica a superfícies implantáveis. Relatórios
+// históricos em docs/migration registram justamente a remoção desses provedores
+// e não representam configuração ativa.
 for (const file of tracked) {
-  if (file.startsWith('vendor/')) continue;
+  if (file.startsWith('vendor/') || file.startsWith('docs/migration/')) continue;
   let content;
   try { content = readFileSync(file, 'utf8'); } catch { continue; }
   if (retiredProviders.test(content)) {

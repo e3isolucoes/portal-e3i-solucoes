@@ -15,4 +15,5 @@ const content = `export const SUPABASE_URL = ${quote(url)};
 export const SUPABASE_ANON_KEY = ${quote(key)};
 `;
 
-writeFileSync(new URL('../js/config.js', import.meta.url), content, { encoding: 'utf8', mode: 0o600 });
+const output = process.env.PUBLIC_CONFIG_OUTPUT || new URL('../js/config.js', import.meta.url);
+writeFileSync(output, content, { encoding: 'utf8', mode: 0o600 });

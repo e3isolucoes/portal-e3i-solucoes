@@ -25,8 +25,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
@@ -42,19 +42,17 @@ jobs:
       - name: Install AWS migration test dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
         working-directory: painel-obrigacoes/aws/migration
-      - name: Create safe test configuration
-        run: node scripts/write-public-config.mjs
-        env:
-          SUPABASE_URL: https://fsyginnpvonruifetjjs.supabase.co
-          # O gerador rejeita valor vazio. Este marcador não é uma credencial e
-          # impede que a validação dependa dos secrets do ambiente de deploy.
-          SUPABASE_ANON_KEY: public-ci-placeholder-not-a-secret
-      - name: Verify generated test configuration
-        run: |
-          test -s js/config.js
-          grep -Fq "public-ci-placeholder-not-a-secret" js/config.js
       - name: Run tests
         run: npm test
+      - name: Verify public configuration generator
+        run: |
+          node scripts/write-public-config.mjs
+          test -s "$PUBLIC_CONFIG_OUTPUT"
+          grep -Fq "public-ci-placeholder-not-a-secret" "$PUBLIC_CONFIG_OUTPUT"
+        env:
+          PUBLIC_CONFIG_OUTPUT: ${{ runner.temp }}/public-config.js
+          SUPABASE_URL: https://fsyginnpvonruifetjjs.supabase.co
+          SUPABASE_ANON_KEY: public-ci-placeholder-not-a-secret
       - name: Run AWS migration tests
         run: corepack pnpm test
         working-directory: painel-obrigacoes/aws/migration
@@ -77,7 +75,7 @@ jobs:
     env:
       AZURE_DEPLOY_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Generate public browser configuration
