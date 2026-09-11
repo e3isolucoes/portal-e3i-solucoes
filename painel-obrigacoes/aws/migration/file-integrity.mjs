@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
-  GetBucketEncryptionCommand, GetBucketPublicAccessBlockCommand, GetBucketVersioningCommand,
+  GetBucketEncryptionCommand, GetPublicAccessBlockCommand, GetBucketVersioningCommand,
   GetObjectCommand, ListObjectsV2Command, PutObjectCommand
 } from '@aws-sdk/client-s3';
 
@@ -71,7 +71,7 @@ export async function readS3Object(s3, bucket, key) {
 export async function assertSecureBucket(s3, bucket) {
   const [encryption, publicAccess, versioning] = await Promise.all([
     s3.send(new GetBucketEncryptionCommand({ Bucket: bucket })),
-    s3.send(new GetBucketPublicAccessBlockCommand({ Bucket: bucket })),
+    s3.send(new GetPublicAccessBlockCommand({ Bucket: bucket })),
     s3.send(new GetBucketVersioningCommand({ Bucket: bucket }))
   ]);
   const algorithms = encryption.ServerSideEncryptionConfiguration?.Rules?.map((rule) => rule.ApplyServerSideEncryptionByDefault?.SSEAlgorithm).filter(Boolean) || [];
