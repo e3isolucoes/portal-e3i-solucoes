@@ -66,7 +66,12 @@ export async function handler(event) {
       return response(200, { access_token: created.access_token, cognito_access_token: created.cognito_access_token }, event, { 'set-cookie': refreshCookie(created.cookieToken) });
     }
     if (method === 'POST' && path === 'session/refresh') {
-      const rotated = await rotateBrowserSession(cognito, ddb, process.env.TABLE_NAME, { userPoolId: process.env.USER_POOL_ID, clientId: process.env.USER_POOL_CLIENT_ID }, readRefreshCookie(event.headers));
+      const refreshToken = readRefreshCookie(event.headers);
+      // A inicialização do frontend consulta esta rota mesmo para visitantes que
+      // nunca autenticaram. Ausência de cookie significa apenas "sem sessão";
+      // preserve 401 para cookies enviados, porém inválidos, expirados ou reutilizados.
+      if (!refreshToken) return response(204, {}, event);
+      const rotated = await rotateBrowserSession(cognito, ddb, process.env.TABLE_NAME, { userPoolId: process.env.USER_POOL_ID, clientId: process.env.USER_POOL_CLIENT_ID }, refreshToken);
       return response(200, { access_token: rotated.access_token, cognito_access_token: rotated.cognito_access_token }, event, { 'set-cookie': refreshCookie(rotated.cookieToken) });
     }
     if (method === 'DELETE' && path === 'session') {

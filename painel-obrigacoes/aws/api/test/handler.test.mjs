@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { errorResponse, handleAuthenticatedRequest } from '../src/handler.mjs';
+import { errorResponse, handleAuthenticatedRequest, handler } from '../src/handler.mjs';
 
 const auth = { workspaceId: 'empresa-a', userId: 'user-a', role: 'member', email: 'user@empresa.test' };
 
@@ -11,6 +11,13 @@ function event(method, path) {
     requestContext: { requestId: 'request-a', http: { method } }
   };
 }
+
+test('refresh sem cookie representa sessão ausente sem gerar falso erro 401', async () => {
+  const result = await handler(event('POST', 'session/refresh'));
+
+  assert.equal(result.statusCode, 204);
+  assert.equal(result.body, '');
+});
 
 test('GET inexistente preserva o erro 404 do repositório', async () => {
   const repository = {
