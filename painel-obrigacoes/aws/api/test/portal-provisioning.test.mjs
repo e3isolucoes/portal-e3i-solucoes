@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { claimPortalProvisioningNonce, provisionPortalAccess, signPortalProvisioning, verifyPortalProvisioning } from '../src/portal-provisioning.mjs';
+import { claimPortalProvisioningNonce, provisionPortalAccess, signLegacyPortalProvisioning, signPortalProvisioning, verifyPortalProvisioning } from '../src/portal-provisioning.mjs';
 
 const secret = '0123456789abcdef0123456789abcdef';
 
@@ -14,6 +14,44 @@ test('aceita somente provisionamento recente e assinado pelo Portal E3I', () => 
   assert.throws(() => verifyPortalProvisioning({ body, headers: { 'x-e3i-timestamp': timestamp, 'x-e3i-signature': signature } }, secret, now), /Nonce/);
   assert.throws(() => verifyPortalProvisioning({ body, headers: { 'x-e3i-timestamp': timestamp, 'x-e3i-nonce': nonce, 'x-e3i-signature': '0'.repeat(64) } }, secret, now), /Assinatura/);
   assert.throws(() => verifyPortalProvisioning({ body, headers: { 'x-e3i-timestamp': String(now - 180_000), 'x-e3i-nonce': nonce, 'x-e3i-signature': signature } }, secret, now), /expirada/);
+});
+
+test('aceita temporariamente a assinatura legada sem nonce e deriva chave de replay estável', () => {
+  const now = 1_800_000_000_000;
+  const body = JSON.stringify({ userId: 'user-1', workspaceId: 'workspace-1' });
+  const timestamp = String(now);
+  const signature = signLegacyPortalProvisioning(secret, timestamp, body);
+
+  const first = verifyPortalProvisioning({
+    body,
+    headers: { 'x-e3i-timestamp': timestamp, 'x-e3i-signature': signature },
+  }, secret, now);
+  const second = verifyPortalProvisioning({
+    body,
+    headers: { 'x-e3i-timestamp': timestamp, 'x-e3i-signature': signature },
+  }, secret, now);
+
+  assert.equal(first.legacy, true);
+  assert.equal(first.timestampMs, now);
+  assert.match(first.nonce, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal(first.nonce, second.nonce);
+});
+
+test('assinatura legada não aceita corpo alterado e não contorna validação temporal', () => {
+  const now = 1_800_000_000_000;
+  const body = JSON.stringify({ userId: 'user-1' });
+  const timestamp = String(now);
+  const signature = signLegacyPortalProvisioning(secret, timestamp, body);
+
+  assert.throws(() => verifyPortalProvisioning({
+    body: JSON.stringify({ userId: 'user-2' }),
+    headers: { 'x-e3i-timestamp': timestamp, 'x-e3i-signature': signature },
+  }, secret, now), /Nonce/);
+
+  assert.throws(() => verifyPortalProvisioning({
+    body,
+    headers: { 'x-e3i-timestamp': String(now - 180_000), 'x-e3i-signature': signature },
+  }, secret, now), /expirada/);
 });
 
 test('aceita timestamp Unix em segundos sem alterar o conteúdo assinado', () => {
