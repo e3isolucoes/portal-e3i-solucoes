@@ -141,13 +141,19 @@ export async function readPortalSsoResponse(response) {
 export async function completePortalSso(location = window.location) {
   const params = new URLSearchParams(location.search || '');
   const fragment = new URLSearchParams((location.hash || '').replace(/^#/, ''));
-  const launchCode = fragment.get('portal_sso_code');
+  // O Portal abre todas as ferramentas com o ticket na query string. As
+  // primeiras versões do Painel esperavam o código somente no fragmento e,
+  // por isso, exibiam novamente a tela de acesso apesar do usuário já estar
+  // autenticado. Mantemos o fragmento como compatibilidade com atalhos antigos.
+  const launchCode = params.get('portal_sso_code') || fragment.get('portal_sso_code');
   const tokenHash = params.get('portal_sso_token');
   if (!launchCode && !tokenHash) return null;
   const tokenType = params.get('portal_sso_type');
-  params.delete('portal_sso_token'); params.delete('portal_sso_type');
+  params.delete('portal_sso_code'); params.delete('portal_sso_token'); params.delete('portal_sso_type');
+  fragment.delete('portal_sso_code');
   const query = params.toString();
-  const cleanUrl = `${location.pathname}${query ? `?${query}` : ''}`;
+  const remainingFragment = fragment.toString();
+  const cleanUrl = `${location.pathname}${query ? `?${query}` : ''}${remainingFragment ? `#${remainingFragment}` : ''}`;
   window.history.replaceState({}, document.title, cleanUrl);
 
   if (launchCode) {
