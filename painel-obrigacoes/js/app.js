@@ -142,7 +142,8 @@ async function boot() {
     if (passwordRecoveryPending) { showResetPasswordScreen(); return; }
     if (session) { enterApp(session); } else { showLogin(); }
   });
-  await bootstrapPortalSession({ restoreSession: setSession });
+  const embeddedPortalSession = await bootstrapPortalSession({ restoreSession: setSession });
+  if (embeddedPortalSession) { await enterApp(embeddedPortalSession); return; }
   getSession().then((res) => {
     if (passwordRecoveryPending) showResetPasswordScreen();
     else if (!res.data.session) showLogin();
