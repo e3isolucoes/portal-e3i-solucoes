@@ -23,23 +23,29 @@ function codeKey(code) {
 }
 
 async function ensureCognitoUser(cognito, { userPoolId, email, userId, displayName }) {
-  let current;
   try {
-    current = await cognito.send(new AdminGetUserCommand({ UserPoolId: userPoolId, Username: email }));
+    await cognito.send(new AdminGetUserCommand({ UserPoolId: userPoolId, Username: email }));
   } catch (error) {
     if (error?.name !== 'UserNotFoundException') throw error;
-    await cognito.send(new AdminCreateUserCommand({
-      UserPoolId: userPoolId,
-      Username: email,
-      MessageAction: 'SUPPRESS',
-      UserAttributes: [
-        { Name: 'email', Value: email },
-        { Name: 'email_verified', Value: 'true' },
-        { Name: 'name', Value: displayName },
-        { Name: 'custom:legacy_user_id', Value: userId },
-      ],
-    }));
-    return { created: true };
+    try {
+      await cognito.send(new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+        MessageAction: 'SUPPRESS',
+        UserAttributes: [
+          { Name: 'email', Value: email },
+          { Name: 'email_verified', Value: 'true' },
+          { Name: 'name', Value: displayName },
+          { Name: 'custom:legacy_user_id', Value: userId },
+        ],
+      }));
+      return { created: true };
+    } catch (createError) {
+      // Duas aberturas da ferramenta podem observar a conta ausente ao mesmo
+      // tempo. Nesse caso a criação vencedora já deixou a conta pronta e a
+      // operação perdedora deve continuar de forma idempotente, não virar 502.
+      if (createError?.name !== 'UsernameExistsException') throw createError;
+    }
   }
   // A chamada que chega aqui já foi autenticada pelo segredo de provisionamento
   // do Portal e protegida contra replay. Contas criadas diretamente no Cognito
