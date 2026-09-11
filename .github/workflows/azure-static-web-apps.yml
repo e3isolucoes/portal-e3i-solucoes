@@ -73,7 +73,7 @@ jobs:
       github.repository == 'e3isolucoes/portal-e3i-solucoes' &&
       (github.event_name == 'push' || github.event.action != 'closed')
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+    environment: preview
     env:
       AZURE_DEPLOY_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
     steps:
