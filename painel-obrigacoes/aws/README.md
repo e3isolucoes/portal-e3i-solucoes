@@ -69,11 +69,15 @@ Pré-requisitos:
 
 ### Conectar o repositório à conta AWS
 
-Execute o bootstrap uma única vez com uma sessão administrativa temporária. O
-template cria a role de menor privilégio usada pelo GitHub; ele não cria access
-keys. Se o provedor OIDC do GitHub ainda não existir na conta, crie-o antes com
-URL `https://token.actions.githubusercontent.com` e audiência
-`sts.amazonaws.com`.
+Execute o bootstrap com uma sessão administrativa temporária. O template cria a
+role de menor privilégio usada pelo GitHub e contém as permissões necessárias
+para os recursos atuais da stack, incluindo DynamoDB/TTL, Lambda e event source
+mappings, SQS, EventBridge Pipes, Scheduler, Cognito, S3, API Gateway, SES e as
+roles geradas pelo SAM. Ele não cria access keys.
+
+Se o provedor OIDC do GitHub ainda não existir na conta, crie-o antes com URL
+`https://token.actions.githubusercontent.com` e audiência `sts.amazonaws.com`.
+Em uma conta nova, o bootstrap pode criar `e3i-staging-deployer` normalmente:
 
 ```bash
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
@@ -92,6 +96,24 @@ gh variable set AWS_STAGING_DEPLOY_ROLE_ARN \
   --env aws-staging \
   --body "$ROLE_ARN"
 ```
+
+Se `e3i-staging-deployer` já existir fora do stack de bootstrap, o
+CloudFormation não consegue adotá-la automaticamente. Nesse caso use o script de
+conexão com a reutilização explícita da role existente; o script valida que a ARN
+pertence à conta autenticada e evita tentar criar uma role duplicada:
+
+```bash
+ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+AWS_EXISTING_DEPLOY_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/e3i-staging-deployer" \
+AZURE_RESOURCE_GROUP="<resource-group>" \
+AZURE_STATIC_WEB_APP="<static-web-app>" \
+  ./scripts/connect-github-clouds.sh
+```
+
+A reutilização explícita não altera silenciosamente a trust policy ou a policy
+da role preexistente. Elas devem permanecer sincronizadas com
+`aws/bootstrap/deployer.yaml`; isso evita que um bootstrap automatizado amplie
+ou substitua permissões de uma role que não é gerenciada pelo stack.
 
 Cadastre também `PORTAL_PROVISIONING_SECRET` como **environment secret** de
 `aws-staging`; nunca o grave em arquivo ou como variável não secreta. Depois,
