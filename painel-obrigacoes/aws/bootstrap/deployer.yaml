@@ -240,7 +240,11 @@ Resources:
                   - iam:TagRole
                   - iam:UntagRole
                   - iam:UpdateAssumeRolePolicy
-                Resource: !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-api
+                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-notifications
+                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-notification-scheduler
+                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-painel-obrigacoes-*
               - Sid: BudgetGuardrail
                 Effect: Allow
                 Action:
