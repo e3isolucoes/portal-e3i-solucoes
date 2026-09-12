@@ -70,7 +70,14 @@ test('infraestrutura de produção protege dados e monitora falhas sem permitir 
   assert.match(template, /PointInTimeRecoveryEnabled: !If \[IsProduction, true, false\]/);
   assert.match(template, /MetricName: Errors/);
   assert.match(template, /MetricName: ReadThrottleEvents/);
+  assert.match(deployer, /dynamodb:UpdateTimeToLive/);
+  assert.match(deployer, /lambda:CreateEventSourceMapping/);
+  assert.match(deployer, /sqs:CreateQueue/);
+  assert.match(deployer, /pipes:CreatePipe/);
+  assert.match(deployer, /scheduler:ListTagsForResource/);
+  assert.match(deployer, /cognito-idp:CreateUserPool/);
   assert.match(deployer, /role\/e3i-staging-\*-api/);
+  assert.match(deployer, /role\/e3i-staging-painel-obrigacoes-\*/);
   assert.doesNotMatch(deployer, /role\/e3i-staging-\*\s*$/m);
 });
 
