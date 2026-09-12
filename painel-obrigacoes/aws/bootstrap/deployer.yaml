@@ -86,14 +86,19 @@ Resources:
                   - dynamodb:DeleteTable
                   - dynamodb:DescribeTable
                   - dynamodb:DescribeContinuousBackups
+                  - dynamodb:DescribeTimeToLive
                   - dynamodb:ListTagsOfResource
                   - dynamodb:TagResource
                   - dynamodb:UntagResource
                   - dynamodb:UpdateContinuousBackups
                   - dynamodb:UpdateTable
+                  - dynamodb:UpdateTimeToLive
                   - lambda:AddPermission
+                  - lambda:CreateEventSourceMapping
                   - lambda:CreateFunction
+                  - lambda:DeleteEventSourceMapping
                   - lambda:DeleteFunction
+                  - lambda:GetEventSourceMapping
                   - lambda:GetFunction
                   - lambda:GetFunctionConfiguration
                   - lambda:ListTags
@@ -102,6 +107,7 @@ Resources:
                   - lambda:RemovePermission
                   - lambda:TagResource
                   - lambda:UntagResource
+                  - lambda:UpdateEventSourceMapping
                   - lambda:UpdateFunctionCode
                   - lambda:UpdateFunctionConfiguration
                   - logs:CreateLogGroup
@@ -127,14 +133,54 @@ Resources:
                   - scheduler:CreateSchedule
                   - scheduler:DeleteSchedule
                   - scheduler:GetSchedule
+                  - scheduler:ListScheduleGroups
                   - scheduler:ListSchedules
+                  - scheduler:ListTagsForResource
+                  - scheduler:TagResource
+                  - scheduler:UntagResource
                   - scheduler:UpdateSchedule
                   - ses:CreateEmailIdentity
                   - ses:DeleteEmailIdentity
                   - ses:GetAccount
                   - ses:GetEmailIdentity
                   - ses:ListEmailIdentities
+                  - cognito-idp:CreateUserPool
+                  - cognito-idp:CreateUserPoolClient
+                  - cognito-idp:DeleteUserPool
+                  - cognito-idp:DeleteUserPoolClient
+                  - cognito-idp:DescribeUserPool
+                  - cognito-idp:DescribeUserPoolClient
+                  - cognito-idp:TagResource
+                  - cognito-idp:UntagResource
+                  - cognito-idp:UpdateUserPool
+                  - cognito-idp:UpdateUserPoolClient
+                  - sqs:ListQueues
                 Resource: '*'
+              - Sid: StagingQueues
+                Effect: Allow
+                Action:
+                  - sqs:CreateQueue
+                  - sqs:DeleteQueue
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ListQueueTags
+                  - sqs:SetQueueAttributes
+                  - sqs:TagQueue
+                  - sqs:UntagQueue
+                Resource: !Sub arn:${AWS::Partition}:sqs:*:${AccountId}:e3i-staging-*
+              - Sid: StagingPipes
+                Effect: Allow
+                Action:
+                  - pipes:CreatePipe
+                  - pipes:DeletePipe
+                  - pipes:DescribePipe
+                  - pipes:ListTagsForResource
+                  - pipes:StartPipe
+                  - pipes:StopPipe
+                  - pipes:TagResource
+                  - pipes:UntagResource
+                  - pipes:UpdatePipe
+                Resource: !Sub arn:${AWS::Partition}:pipes:*:${AccountId}:pipe/e3i-staging-*
               - Sid: E3iBucketInfrastructure
                 Effect: Allow
                 Action:
@@ -176,23 +222,25 @@ Resources:
                   - s3:PutObject
                   - s3:DeleteObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::e3i-staging-artifacts-${AccountId}/*
-              - Sid: E3iLambdaRoles
+              - Sid: E3iGeneratedRoles
                 Effect: Allow
                 Action:
                   - iam:AttachRolePolicy
                   - iam:CreateRole
                   - iam:DeleteRole
                   - iam:DeleteRolePolicy
+                  - iam:DetachRolePolicy
                   - iam:GetRole
                   - iam:GetRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRolePolicies
+                  - iam:ListRoleTags
                   - iam:PassRole
                   - iam:PutRolePolicy
                   - iam:TagRole
                   - iam:UntagRole
-                Resource:
-                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-api
-                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-notifications
-                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-notification-scheduler
+                  - iam:UpdateAssumeRolePolicy
+                Resource: !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*
               - Sid: BudgetGuardrail
                 Effect: Allow
                 Action:
