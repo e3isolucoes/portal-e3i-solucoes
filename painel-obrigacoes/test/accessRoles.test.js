@@ -3,13 +3,14 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
-  STATE, isAdmin, isManager, canViewAllObligations,
+  STATE, isAdmin, isManager, canWriteObligations, canViewAllObligations,
 } from '../js/state.js';
 import { renderBoard } from '../js/ui/board.js';
 import { renderToolbar } from '../js/ui/toolbar.js';
 
 test.afterEach(() => {
   STATE.profile = null;
+  STATE.session = null;
   STATE.obligations = [];
   STATE.companies = [];
   STATE.validation = { pending: 0, rejected: 0 };
@@ -41,12 +42,33 @@ test('gestor visualiza toda a carteira mesmo ao chegar pelo antigo recorte pesso
   assert.match(html, /GESTÃO À VISTA · AGORA/);
 });
 
-test('membro ativo pode iniciar o cadastro de uma obrigação', () => {
+test('membro ativo pode incluir, editar e excluir atividades/obrigações', async () => {
   STATE.profile = { role: 'membro', active: true };
+  STATE.session = { id: 'membro-1' };
+  STATE.obligations = [{
+    id: 'ob-1', name: 'Obrigação editável', category: 'federal', frequency: 'pontual',
+    due_date: '2099-12-31', responsible: 'Membro', responsible_id: 'membro-1',
+    company_id: null, business_day_shift: 'nenhum',
+  }];
+
   assert.equal(isManager(), false);
+  assert.equal(canWriteObligations(), true);
   assert.equal(canViewAllObligations(), false);
   assert.match(renderToolbar(), /data-action="new"/);
+  assert.match(renderBoard({ onlyMine: true }), /data-action="edit" data-id="ob-1"/);
   assert.doesNotMatch(renderToolbar(), /data-tab="manage"/);
+
+  const [renderSource, modalSource, validatorSource, modelSource] = await Promise.all([
+    readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/ui/modal.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/ui/validatorField.js', import.meta.url), 'utf8'),
+    readFile(new URL('../aws/api/src/model.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(renderSource, /action === 'edit'[\s\S]*?canWriteObligations\(\)/);
+  assert.match(renderSource, /action === 'delete'[\s\S]*?canWriteObligations\(\)/);
+  assert.match(modalSource, /data-action="delete-in-modal"/);
+  assert.match(validatorSource, /fRequiresValidation[\s\S]*?fValidator[\s\S]*?hidden/);
+  assert.match(modelSource, /obligations:[\s\S]*?write: \['member', 'manager', 'admin', 'super_admin'\]/);
 });
 
 test('módulos administrativos não reutilizam categorias de obrigação acessória', async () => {
