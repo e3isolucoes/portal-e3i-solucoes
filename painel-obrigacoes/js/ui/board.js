@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, isManager, canViewAllObligations, companyName, lastCompletion, activeOccurrences, checklistProgress,
+  STATE, isAdmin, canWriteObligations, canViewAllObligations, companyName, lastCompletion, activeOccurrences, checklistProgress,
 } from '../state.js';
 import { catInfo, moduleInfo, FREQ_LABELS, priorityInfo } from '../constants.js';
 import {
@@ -89,7 +89,7 @@ function renderCard(it) {
   } else {
     actionsHtml += '<button class="btn-sm" disabled>Sem pendência ativa</button>';
   }
-  if (isManager()) {
+  if (canWriteObligations()) {
     actionsHtml += `<button class="btn-sm edit" data-action="edit" data-id="${ob.id}">Editar</button>`;
   }
   actionsHtml += '</div>';

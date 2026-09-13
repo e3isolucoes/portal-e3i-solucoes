@@ -61,6 +61,14 @@ export function canViewAllObligations() {
   return isManager();
 }
 
+// Criar, editar e excluir atividades/obrigações é uma permissão operacional
+// compartilhada por todos os papéis ativos do workspace. Poderes de gestão
+// (equipe, acessos, relatórios etc.) continuam separados em isManager/isAdmin.
+export function canWriteObligations() {
+  return ['super_admin', 'admin', 'gestor', 'manager', 'membro', 'member'].includes(STATE.profile?.role)
+    && STATE.profile?.active !== false;
+}
+
 export function canAccessModule(moduleKey) {
   if (isAdmin() || STATE.profile?.module_access == null) return true;
   return Array.isArray(STATE.profile.module_access) && STATE.profile.module_access.includes(moduleKey);

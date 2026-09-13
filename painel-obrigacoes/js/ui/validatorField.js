@@ -21,9 +21,14 @@ export function validatorFieldHtml(ob, profiles = [], isAdmin = false) {
   const atual = ob?.validator_id || '';
 
   if (!isAdmin) {
-    if (!ob?.requires_validation) return '';
+    // Na edição por membro a configuração continua somente leitura, mas os
+    // valores atuais precisam acompanhar o submit. Sem estes campos ocultos,
+    // uma edição operacional poderia reativar validação ou apagar o validador.
+    const preserved = `<input type="checkbox" id="fRequiresValidation" ${marcado} hidden aria-hidden="true" />`
+      + `<input type="hidden" id="fValidator" value="${escapeHtml(atual)}" />`;
+    if (!ob?.requires_validation) return preserved;
     const quem = profiles.find(p => p.id === atual);
-    return `
+    return preserved + `
       <div class="field field-leitura">
         <label>Validação</label>
         <p class="valor-leitura">
