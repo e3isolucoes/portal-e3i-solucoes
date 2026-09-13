@@ -1,4 +1,4 @@
-import { STATE, isAdmin, isManager, isSuperUser, activeOccurrences } from './state.js';
+import { STATE, isAdmin, isManager, isSuperUser, canWriteObligations, activeOccurrences } from './state.js';
 import { escapeHtml, deltaLabel } from './dateUtils.js';
 import { renderToolbar } from './ui/toolbar.js';
 import { selecionarVisaoExecutiva } from './ui/executiveView.js';
@@ -248,11 +248,11 @@ function onAppClick(e) {
     doUpdateWorkspaceAccess(id, btn.getAttribute('data-status'), render);
     return;
   }
-  if (action === 'new') { openModal(null, { onSaved: render }); return; }
-  if (action === 'edit') { if (isManager()) openModal(id, { onSaved: render }); return; }
+  if (action === 'new') { if (canWriteObligations()) openModal(null, { onSaved: render }); return; }
+  if (action === 'edit') { if (canWriteObligations()) openModal(id, { onSaved: render }); return; }
   if (action === 'done') { doMarkDone(id, render); return; }
   if (action === 'undo') { doUndoLast(id, render); return; }
-  if (action === 'delete') { if (isManager()) doDeleteObligation(id, render); return; }
+  if (action === 'delete') { if (canWriteObligations()) doDeleteObligation(id, render); return; }
   if (action === 'close') { closeModal(); return; }
 
   if (action === 'manage-tab') {
