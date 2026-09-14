@@ -5,6 +5,7 @@ import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-
 import { authenticate } from './auth.mjs';
 import { createDownloadUrl, createUploadUrl } from './files.mjs';
 import { claimPortalProvisioningNonce, provisionPortalAccess, verifyPortalProvisioning } from './portal-provisioning.mjs';
+import { resolvePortalIdentity } from './portal-identity.mjs';
 import { consumePortalSession, createPortalSession } from './portal-session.mjs';
 import { createPasswordSession, issueBrowserSession, readRefreshCookie, refreshCookie, revokeBrowserSession, rotateBrowserSession } from './browser-session.mjs';
 import { Repository } from './repository.mjs';
@@ -48,11 +49,12 @@ export async function handler(event) {
     if (method === 'POST' && path === 'internal/portal-access') {
       const verified = verifyPortalProvisioning(event, process.env.PORTAL_PROVISIONING_SECRET);
       await claimPortalProvisioningNonce(ddb, process.env.TABLE_NAME, verified.nonce);
-      const input = parseBody(event);
+      const receivedInput = parseBody(event);
+      const input = await resolvePortalIdentity(cognito, ddb, process.env.TABLE_NAME, process.env.USER_POOL_ID, receivedInput);
       const access = await provisionPortalAccess(ddb, process.env.TABLE_NAME, input);
       const session = await createPortalSession(cognito, ddb, process.env.TABLE_NAME, {
         userPoolId: process.env.USER_POOL_ID, clientId: process.env.USER_POOL_CLIENT_ID,
-      }, { ...access, email: String(input.email).trim().toLowerCase(), displayName: String(input.displayName).trim() });
+      }, { ...access, email: input.email, displayName: input.displayName });
       return response(200, { ...access, ...session }, event);
     }
     if (method === 'POST' && path === 'portal-session/exchange') {
