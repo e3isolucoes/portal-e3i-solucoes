@@ -80,6 +80,11 @@ export function renderToolbar() {
   const moduleOptions = ADMINISTRATIVE_MODULES
     .filter((module) => canAccessModule(module.key))
     .map((module) => ({ value: module.key, label: module.label }));
+  const activeModuleInfo = STATE.activeModule === 'all'
+    ? null
+    : ADMINISTRATIVE_MODULES.find((module) => module.key === STATE.activeModule && canAccessModule(module.key));
+  const moduleContextLabel = activeModuleInfo?.label || 'Todos os módulos';
+  const moduleContextColor = activeModuleInfo?.color || '#5C6672';
   const periodOptions = competenceOptions();
 
   const activeFilterCount = Object.values(STATE.filters)
@@ -91,8 +96,9 @@ export function renderToolbar() {
   html += '<nav class="tabs" aria-label="Áreas do painel">';
   if (hasModuleGrant(STATE.profile, 'obrigacoes')) {
     html += tab('board', 'Atividades');
-    const modules = ADMINISTRATIVE_MODULES.filter((module) => canAccessModule(module.key));
-    html += `<div class="module-tabs" aria-label="Módulos administrativos">${modules.map((module) => `<button type="button" class="module-tab ${STATE.activeModule === module.key ? 'active' : ''}" style="--module-color:${escapeHtml(module.color)}" data-action="module" data-module="${module.key}">${escapeHtml(module.label)}</button>`).join('')}</div>`;
+    html += '<div class="module-tabs" aria-label="Módulo em uso">'
+      + `<span class="module-tab active" style="--module-color:${escapeHtml(moduleContextColor)};cursor:default" aria-label="Módulo selecionado: ${escapeHtml(moduleContextLabel)}">Módulo: ${escapeHtml(moduleContextLabel)}</span>`
+      + '</div>';
     if (!isManager()) html += tab('mine', `Minhas atividades${mineCount ? ` (${mineCount})` : ''}`);
   }
 
