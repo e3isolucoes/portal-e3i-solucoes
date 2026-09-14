@@ -78,6 +78,7 @@ test('infraestrutura de produção protege dados e monitora falhas sem permitir 
   assert.match(deployer, /cognito-idp:CreateUserPool/);
   assert.match(deployer, /role\/e3i-staging-\*-api/);
   assert.match(deployer, /role\/e3i-staging-painel-obrigacoes-\*/);
+  assert.match(deployer, /role\/e3i-staging-painel-obriga-\*/);
   assert.doesNotMatch(deployer, /role\/e3i-staging-\*\s*$/m);
 });
 
