@@ -2,6 +2,19 @@ import { supabase } from '../supabaseClient.js';
 import { withCurrentWorkspace, withCurrentWorkspaceMany } from './workspaceContext.js';
 import { awsData, isAwsDataBackend } from './awsDataClient.js';
 
+// O data.js mantém uma lista explícita de campos do payload por compatibilidade
+// com o legado. A competência nova é persistida no backend AWS atual. No rollback
+// Supabase não enviamos a coluna até existir uma migration equivalente, evitando
+// quebrar a reversão explícita por causa de um campo que a tabela antiga não tem.
+function withInteractiveCompetence(payload) {
+  if (typeof document === 'undefined') return payload;
+  const field = document.getElementById('fCompetenceOffset');
+  if (!field) return payload;
+  const parsed = Number.parseInt(field.value, 10);
+  const competenceOffset = Number.isInteger(parsed) ? Math.max(0, Math.min(36, parsed)) : 0;
+  return { ...payload, competence_offset_months: competenceOffset };
+}
+
 export async function fetchObligations() {
   if (isAwsDataBackend()) return (await awsData.list('obligations')).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
   const { data, error } = await supabase.from('obligations').select('*').order('name');
@@ -12,7 +25,7 @@ export async function fetchObligations() {
 // `ob` já vem no formato de coluna do banco (day_of_month, due_date, etc.)
 // — ver js/ui/modal.js, função formToObligationPayload.
 export async function createObligation(ob) {
-  if (isAwsDataBackend()) return awsData.create('obligations', ob);
+  if (isAwsDataBackend()) return awsData.create('obligations', withInteractiveCompetence(ob));
   // A criação unitária é permitida a todo membro autenticado. Importações em
   // massa continuam usando a RPC restrita à Gestão.
   const { data, error } = await supabase
@@ -58,7 +71,7 @@ export async function createObligationsBulk(obs) {
 }
 
 export async function updateObligation(id, patch) {
-  if (isAwsDataBackend()) return awsData.update('obligations', id, patch);
+  if (isAwsDataBackend()) return awsData.update('obligations', id, withInteractiveCompetence(patch));
   const { data, error } = await supabase.from('obligations').update(patch).eq('id', id).select().single();
   if (error) throw error;
   return data;

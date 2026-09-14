@@ -8,9 +8,11 @@ function resetState() {
   STATE.profile = { role: 'membro', active: true };
   STATE.session = { id: 'user-1' };
   STATE.obligations = [];
+  STATE.completions = [];
   STATE.companies = [];
+  STATE.activeModule = 'all';
   STATE.filters = {
-    empresa: 'all', category: 'all', responsible: 'all', status: 'all', receipt: 'all',
+    empresa: 'all', category: 'all', responsible: 'all', status: 'all', receipt: 'all', competence: 'all',
   };
   STATE.validation = { pending: 0, rejected: 0 };
   STATE.view = 'board';
@@ -24,7 +26,9 @@ test('toolbar identifica navegação atual e oferece filtros acessíveis', () =>
   assert.match(html, /data-tab="board" aria-current="page"/);
   assert.match(html, /aria-haspopup="listbox" aria-expanded="false"/);
   assert.match(html, /role="option" aria-selected="true"/);
-  assert.doesNotMatch(html, /data-action="clear-filters"/);
+  assert.match(html, /data-action="module-filter"[^>]*aria-label="Todos os módulos"/);
+  assert.match(html, /data-action="filter-select" data-filter="competence"[^>]*aria-label="Todas as competências"/);
+  assert.match(html, /data-action="clear-filters"[^>]*disabled[^>]*>Remover filtros/);
   assert.match(html, /data-dd="status" data-value="today"[^>]*>Vence hoje/);
   assert.doesNotMatch(html, /Todos os vencimentos/);
   assert.match(html, /data-value="missing"[^>]*>Sem comprovante/);
@@ -40,7 +44,7 @@ test('toolbar identifica Vence hoje como status selecionado', () => {
   assert.match(html, /data-dd="status" data-value="today"[^>]*aria-selected="true"[^>]*>Vence hoje/);
 });
 
-test('toolbar sinaliza e permite limpar filtros ativos', () => {
+test('toolbar sinaliza e permite remover filtros ativos', () => {
   resetState();
   STATE.filters.empresa = 'empresa-1';
   STATE.filters.status = 'red';
@@ -48,8 +52,8 @@ test('toolbar sinaliza e permite limpar filtros ativos', () => {
   const html = renderToolbar();
 
   assert.match(html, /data-action="clear-filters"/);
-  assert.match(html, /Limpar 2 filtro\(s\) ativo\(s\)/);
-  assert.match(html, /Limpar filtros <span>2<\/span>/);
+  assert.doesNotMatch(html, /data-action="clear-filters"[^>]*disabled/);
+  assert.match(html, />Remover filtros <span>2<\/span>/);
 });
 
 test('toolbar contabiliza o filtro de comprovante', () => {
@@ -58,6 +62,18 @@ test('toolbar contabiliza o filtro de comprovante', () => {
 
   const html = renderToolbar();
 
-  assert.match(html, /Sem comprovante<\/span>/);
-  assert.match(html, /Limpar 1 filtro\(s\) ativo\(s\)/);
+  assert.match(html, /class="dd-label">Sem comprovante<\/span>/);
+  assert.match(html, />Remover filtros <span>1<\/span>/);
+});
+
+test('toolbar contabiliza o filtro de módulo junto dos demais filtros', () => {
+  resetState();
+  STATE.activeModule = 'fiscal';
+  STATE.filters.competence = '2026-08';
+  STATE.obligations = [{ id: 'ob-1', module_key: 'fiscal', competence_offset_months: 1, frequency: 'pontual', due_date: '2026-09-20' }];
+
+  const html = renderToolbar();
+
+  assert.match(html, /data-action="module-filter"[^>]*>[\s\S]*<option value="fiscal" selected>Fiscal<\/option>/);
+  assert.match(html, />Remover filtros <span>2<\/span>/);
 });

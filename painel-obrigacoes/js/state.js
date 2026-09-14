@@ -8,7 +8,7 @@ export const STATE = {
   activeModule: 'all',
   manageSection: 'obligations', // 'obligations' | 'companies' | 'team' | 'import' | 'rules' (dentro da aba Gerenciar)
   filters: {
-    empresa: 'all', category: 'all', responsible: 'all', status: 'all', receipt: 'all',
+    empresa: 'all', category: 'all', responsible: 'all', status: 'all', receipt: 'all', competence: 'all',
   },
   editingId: null,
   editingCompanyId: null,
@@ -74,6 +74,41 @@ export function canAccessModule(moduleKey) {
   return Array.isArray(STATE.profile.module_access) && STATE.profile.module_access.includes(moduleKey);
 }
 
+// A competência é o período de movimento/apuração e não o vencimento.
+// O deslocamento fica na própria obrigação para que uma recorrência como
+// "vence dia 20 do mês seguinte" continue automática em todos os ciclos.
+// Ex.: vencimento 20/09/2026 + competence_offset_months=1 => 08/2026.
+export function competenceForOccurrence(obligation, occurrenceDate) {
+  if (!occurrenceDate) return null;
+
+  let year;
+  let monthIndex;
+  if (occurrenceDate instanceof Date) {
+    if (Number.isNaN(occurrenceDate.getTime())) return null;
+    year = occurrenceDate.getFullYear();
+    monthIndex = occurrenceDate.getMonth();
+  } else {
+    const match = /^(\d{4})-(\d{2})/.exec(String(occurrenceDate));
+    if (!match) return null;
+    year = Number(match[1]);
+    monthIndex = Number(match[2]) - 1;
+  }
+
+  const parsedOffset = Number(obligation?.competence_offset_months ?? 0);
+  const offset = Number.isInteger(parsedOffset) ? Math.max(0, Math.min(36, parsedOffset)) : 0;
+  return new Date(year, monthIndex - offset, 1);
+}
+
+export function competenceKey(dateValue) {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) return '';
+  return `${dateValue.getFullYear()}-${String(dateValue.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function competenceLabel(dateValue) {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) return '—';
+  return `${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()}`;
+}
+
 // Mapa obligation_id -> Set(occurrence_date "YYYY-MM-DD") para consultas
 // rápidas de "essa ocorrência já foi concluída?".
 export function completionsIndex() {
@@ -121,6 +156,8 @@ export function overrideForOccurrence(obligationId, rawDateKey) {
 // data EFETIVA depois de aplicar uma eventual exceção (ver
 // obligation_date_overrides) — é essa que deve aparecer na tela e que
 // define o status (atrasada/vence em breve/no prazo).
+// A competência também usa `active`, não `displayDate`: uma prorrogação do
+// vencimento não muda o período de movimento da obrigação.
 // Regras do catálogo (obligation_rules) vinculadas a um regime tributário.
 export function rulesForRegime(regimeId) {
   const ruleIds = new Set(
@@ -155,8 +192,9 @@ export function activeOccurrences() {
     const override = active ? overrideForOccurrence(ob.id, fmtKey(active)) : null;
     const displayDate = override ? new Date(`${override.override_date}T00:00:00`) : active;
     const status = statusOf(displayDate);
+    const competence = competenceForOccurrence(ob, active);
     return {
-      ob, active, displayDate, override, status,
+      ob, active, displayDate, override, status, competence,
     };
   });
 }

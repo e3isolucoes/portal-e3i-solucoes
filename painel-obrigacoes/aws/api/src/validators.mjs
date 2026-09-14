@@ -26,7 +26,7 @@ const schemas = Object.freeze({
     fields: {
       id: id(), name: text(300), category: text(100), company_id: id({ nullable: true }), responsible: text(200), responsible_id: id({ nullable: true }),
       frequency: enumeration(['diaria', 'mensal', 'trimestral', 'anual', 'pontual']), day_of_month: integer(1, 31, { nullable: true }), month: integer(1, 12, { nullable: true }), months: ids({ nullable: true }),
-      due_date: date({ nullable: true }), notes: text(10_000), activity_type: enumeration(['obrigacao_acessoria', 'rotina', 'tarefa', 'marco']), process_name: text(300), area_name: text(200),
+      due_date: date({ nullable: true }), competence_offset_months: integer(0, 36), notes: text(10_000), activity_type: enumeration(['obrigacao_acessoria', 'rotina', 'tarefa', 'marco']), process_name: text(300), area_name: text(200),
       predecessor_id: id({ nullable: true }), module_key: id(), requires_attachment: boolean(), requires_attachment_no_movement: boolean(), priority: enumeration(['baixa', 'media', 'alta', 'critica']),
       adjust_business_day: boolean(), day_type: enumeration(['fixo', 'util_do_mes']), business_day_shift: enumeration(['nenhum', 'proximo_util', 'anterior_util']), requires_validation: boolean(), validator_id: id({ nullable: true })
     },
@@ -44,7 +44,7 @@ const schemas = Object.freeze({
   holidays: { fields: { id: id(), holiday_date: date(), name: text(200), scope: enumeration(['nacional', 'estadual', 'municipal']) }, required: ['holiday_date', 'name'] },
   checklist_items: { fields: { id: id(), obligation_id: id(), description: text(1_000), position: integer(0, 10_000), done: boolean(), completed: boolean(), completed_by: id({ nullable: true }), completed_at: timestamp({ nullable: true }) }, required: ['obligation_id', 'description'] },
   obligation_rules: {
-    fields: { id: id(), name: text(300), category: text(100), frequency: enumeration(['mensal', 'trimestral', 'anual']), day_type: enumeration(['fixo', 'util_do_mes']), day_of_month: integer(1, 31), month: integer(1, 12, { nullable: true }), months: ids({ nullable: true }), adjust_business_day: boolean(), business_day_shift: enumeration(['nenhum', 'proximo_util', 'anterior_util']), notes: text(10_000), checklist_template: strings() },
+    fields: { id: id(), name: text(300), category: text(100), frequency: enumeration(['mensal', 'trimestral', 'anual']), day_type: enumeration(['fixo', 'util_do_mes']), day_of_month: integer(1, 31), month: integer(1, 12, { nullable: true }), months: ids({ nullable: true }), competence_offset_months: integer(0, 36), adjust_business_day: boolean(), business_day_shift: enumeration(['nenhum', 'proximo_util', 'anterior_util']), notes: text(10_000), checklist_template: strings() },
     required: ['name', 'category', 'frequency', 'day_of_month']
   },
   obligation_date_overrides: { fields: { id: id(), obligation_id: id(), original_date: date(), override_date: date(), reason: text(2_000) }, required: ['obligation_id', 'original_date', 'override_date'] },

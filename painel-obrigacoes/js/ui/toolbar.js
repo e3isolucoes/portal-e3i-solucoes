@@ -1,4 +1,7 @@
-import { STATE, isAdmin, isManager, isSuperUser, canAccessModule } from '../state.js';
+import {
+  STATE, isAdmin, isManager, isSuperUser, canAccessModule, activeOccurrences,
+  competenceForOccurrence, competenceKey, competenceLabel,
+} from '../state.js';
 import { CATEGORIES, ADMINISTRATIVE_MODULES } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
 import { validationBadgeCount } from './validationQueue.js';
@@ -30,6 +33,37 @@ function ddHtml(key, allLabel, options, selected) {
     + '</div>';
 }
 
+function selectFilterHtml({ action, key, allLabel, options, selected }) {
+  const value = selected || 'all';
+  const dataKey = action === 'module-filter' ? '' : ` data-filter="${escapeHtml(key)}"`;
+  return `<select class="dd-btn filter-select" data-action="${action}"${dataKey} aria-label="${escapeHtml(allLabel)}">`
+    + `<option value="all" ${value === 'all' ? 'selected' : ''}>${escapeHtml(allLabel)}</option>`
+    + options.map((option) => `<option value="${escapeHtml(option.value)}" ${value === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')
+    + '</select>';
+}
+
+function competenceOptions() {
+  const byId = new Map(STATE.obligations.map((ob) => [ob.id, ob]));
+  const periods = new Map();
+
+  activeOccurrences().forEach(({ competence }) => {
+    const key = competenceKey(competence);
+    if (key) periods.set(key, competenceLabel(competence));
+  });
+
+  STATE.completions.forEach((completion) => {
+    const obligation = byId.get(completion.obligation_id);
+    if (!obligation) return;
+    const competence = competenceForOccurrence(obligation, completion.occurrence_date);
+    const key = competenceKey(competence);
+    if (key) periods.set(key, competenceLabel(competence));
+  });
+
+  return Array.from(periods.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([value, label]) => ({ value, label }));
+}
+
 export function renderToolbar() {
   const resp = distinctResponsibles();
   const empresaOptions = STATE.companies.map((c) => ({ value: c.id, label: c.name }));
@@ -43,8 +77,14 @@ export function renderToolbar() {
     { value: 'muted', label: 'Sem pendência próxima' },
   ];
   const receiptOptions = [{ value: 'missing', label: 'Sem comprovante' }];
+  const moduleOptions = ADMINISTRATIVE_MODULES
+    .filter((module) => canAccessModule(module.key))
+    .map((module) => ({ value: module.key, label: module.label }));
+  const periodOptions = competenceOptions();
 
-  const activeFilterCount = Object.values(STATE.filters).filter((value) => value !== 'all').length;
+  const activeFilterCount = Object.values(STATE.filters)
+    .filter((value) => (value ?? 'all') !== 'all').length
+    + (STATE.activeModule !== 'all' ? 1 : 0);
   const tab = (view, label) => `<button class="tab-btn ${STATE.view === view ? 'active' : ''}" data-action="tab" data-tab="${view}"${STATE.view === view ? ' aria-current="page"' : ''}>${label}</button>`;
 
   let html = '<section class="toolbar" aria-label="Navegação e filtros">';
@@ -71,15 +111,21 @@ export function renderToolbar() {
   if (isSuperUser()) html += tab('system-admin', 'Administração do sistema');
   html += '</nav>';
 
-  html += `<div class="filters"><span class="filters-label">Filtrar</span>`;
-  html += ddHtml('empresa', 'Todas as empresas', empresaOptions, STATE.filters.empresa);
-  html += ddHtml('category', 'Categorias de obrigação', CATEGORIES.map((c) => ({ value: c.key, label: c.label })), STATE.filters.category);
-  html += ddHtml('responsible', 'Todos os responsáveis', resp.map((r) => ({ value: r, label: r })), STATE.filters.responsible);
-  html += ddHtml('status', 'Todos os status', statusOptions, STATE.filters.status);
-  html += ddHtml('receipt', 'Com ou sem comprovante', receiptOptions, STATE.filters.receipt || 'all');
-  if (activeFilterCount) {
-    html += `<button type="button" class="clear-filters" data-action="clear-filters" aria-label="Limpar ${activeFilterCount} filtro(s) ativo(s)">Limpar filtros <span>${activeFilterCount}</span></button>`;
+  html += '<div class="filters"><span class="filters-label">Filtrar</span>';
+  if (hasModuleGrant(STATE.profile, 'obrigacoes')) {
+    html += selectFilterHtml({
+      action: 'module-filter', key: 'module', allLabel: 'Todos os módulos', options: moduleOptions, selected: STATE.activeModule,
+    });
   }
+  html += ddHtml('empresa', 'Todas as empresas', empresaOptions, STATE.filters.empresa || 'all');
+  html += ddHtml('category', 'Categorias de obrigação', CATEGORIES.map((c) => ({ value: c.key, label: c.label })), STATE.filters.category || 'all');
+  html += ddHtml('responsible', 'Todos os responsáveis', resp.map((r) => ({ value: r, label: r })), STATE.filters.responsible || 'all');
+  html += ddHtml('status', 'Todos os status', statusOptions, STATE.filters.status || 'all');
+  html += ddHtml('receipt', 'Com ou sem comprovante', receiptOptions, STATE.filters.receipt || 'all');
+  html += selectFilterHtml({
+    action: 'filter-select', key: 'competence', allLabel: 'Todas as competências', options: periodOptions, selected: STATE.filters.competence || 'all',
+  });
+  html += `<button type="button" class="clear-filters" data-action="clear-filters" aria-label="Remover todos os filtros" ${activeFilterCount ? '' : 'disabled'}>Remover filtros${activeFilterCount ? ` <span>${activeFilterCount}</span>` : ''}</button>`;
   if (hasModuleGrant(STATE.profile, 'obrigacoes')) html += '<button class="btn-primary" data-action="new">+ Nova atividade</button>';
   html += '</div></section>';
   return html;
