@@ -52,18 +52,22 @@ if (!daniela) {
 const danielaMembership = memberships.find(
   (membership) => membership.userId === daniela.id && membership.status === 'ACTIVE',
 );
-if (!danielaMembership?.organizationId) {
-  console.error('PORTAL_USER_RECONCILIATION_FAILED active GRA organization membership not found');
+const organizationId = danielaMembership?.organizationId
+  || daniela.tenantId
+  || tenants.find((tenant) => /gra\s*com/i.test(`${tenant.tradeName || ''} ${tenant.legalName || ''}`))?.id;
+
+if (!organizationId) {
+  console.error('PORTAL_USER_RECONCILIATION_FAILED GRA organization could not be resolved');
   process.exit(5);
 }
 
-const organizationId = danielaMembership.organizationId;
 const organization = tenants.find((tenant) => tenant.id === organizationId);
 if (!organization || organization.status !== 'ACTIVE') {
   console.error('PORTAL_USER_RECONCILIATION_FAILED GRA organization is missing or inactive');
   process.exit(6);
 }
 
+const membershipRole = danielaMembership?.role || daniela.systemRole || daniela.role || 'OPERATOR';
 let changed = false;
 const now = new Date().toISOString();
 
@@ -115,7 +119,7 @@ for (const target of TARGETS) {
       id: `mem-migrated-${user.id}`,
       userId: user.id,
       organizationId,
-      role: danielaMembership.role || 'OPERATOR',
+      role: membershipRole,
       status: 'ACTIVE',
       joinedAt: now,
     });
@@ -124,16 +128,14 @@ for (const target of TARGETS) {
   }
 }
 
-if (organization) {
-  const memberIds = new Set(
-    memberships
-      .filter((membership) => membership.organizationId === organizationId && membership.status === 'ACTIVE')
-      .map((membership) => membership.userId),
-  );
-  if (organization.usersCount !== memberIds.size) {
-    organization.usersCount = memberIds.size;
-    changed = true;
-  }
+const memberIds = new Set(
+  memberships
+    .filter((membership) => membership.organizationId === organizationId && membership.status === 'ACTIVE')
+    .map((membership) => membership.userId),
+);
+if (organization.usersCount !== memberIds.size) {
+  organization.usersCount = memberIds.size;
+  changed = true;
 }
 
 if (changed) {
