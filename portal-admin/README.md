@@ -31,7 +31,7 @@ Ao tentar entrar com uma conta marcada para primeiro acesso:
 5. a alteração só é concluída se o hash retornado for Argon2; não existe downgrade para SHA-256 nesse fluxo;
 6. sessões antigas do usuário são revogadas e a conta deixa de exigir troca no próximo login.
 
-As contas reconciliadas são `fiscal@gracomercio.com.br`, `nfe@gracomercio.com.br`, `fiscal2@gracomercio.com.br`, `samea@gracomercio.com.br`, `marcomirandacoc@gmail.com` e `daniela@gracomercio.com.br`. `contato@e3isolucoes.com.br` continua reservado para notificações e não é criado como usuário.
+As contas reconciliadas são `fiscal@gracomercio.com.br`, `nfe@gracomercio.com.br`, `fiscal2@gracomercio.com.br`, `samea@gracomercio.com.br`, `marcomirandacoc@gmail.com`, `marcoantoniomiranda713@gmail.com` e `daniela@gracomercio.com.br`. As contas recebem papel operacional no Portal; os papéis específicos do Painel continuam sendo resolvidos pelo backend AWS, evitando promover automaticamente um usuário a administrador global do Portal. `contato@e3isolucoes.com.br` continua reservado para notificações e não é criado como usuário.
 
 ## Tela de ferramentas
 
