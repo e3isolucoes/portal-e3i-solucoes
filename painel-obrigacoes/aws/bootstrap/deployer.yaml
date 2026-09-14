@@ -245,6 +245,7 @@ Resources:
                   - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-notifications
                   - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-*-notification-scheduler
                   - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-painel-obrigacoes-*
+                  - !Sub arn:${AWS::Partition}:iam::${AccountId}:role/e3i-staging-painel-obriga-*
               - Sid: BudgetGuardrail
                 Effect: Allow
                 Action:
