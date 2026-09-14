@@ -28,6 +28,15 @@ function showFieldError(message) {
   actions.before(el);
 }
 
+function competenceOffsetOptions(selected = 0) {
+  return Array.from({ length: 37 }, (_, offset) => {
+    const label = offset === 0
+      ? 'Mesmo mês do vencimento'
+      : (offset === 1 ? '1 mês anterior ao vencimento' : `${offset} meses anteriores ao vencimento`);
+    return `<option value="${offset}" ${Number(selected || 0) === offset ? 'selected' : ''}>${label}</option>`;
+  }).join('');
+}
+
 export function openModal(editId, { onSaved } = {}) {
   onSavedCallback = onSaved || null;
   STATE.editingId = editId || null;
@@ -46,6 +55,7 @@ export function openModal(editId, { onSaved } = {}) {
     month: 1,
     months: [3, 6, 9, 12],
     due_date: '',
+    competence_offset_months: 0,
     notes: '',
     priority: 'media',
     business_day_shift: 'nenhum',
@@ -124,6 +134,7 @@ export function openModal(editId, { onSaved } = {}) {
     + `<option value="anual" ${ob.frequency === 'anual' ? 'selected' : ''}>Anual</option>`
     + `<option value="pontual" ${ob.frequency === 'pontual' ? 'selected' : ''}>Pontual (data única)</option>`
     + '</select></div>';
+  html += `<div class="field"><label>Competência / período de movimento</label><select id="fCompetenceOffset">${competenceOffsetOptions(ob.competence_offset_months)}</select><small>Define a competência automaticamente a partir do vencimento. Ex.: movimento de agosto com entrega em setembro = 1 mês anterior ao vencimento.</small></div>`;
 
   const priorityOptions = PRIORITIES.map((p) => `<option value="${p.key}" ${ob.priority === p.key ? 'selected' : ''}>${p.label}</option>`).join('');
   html += `<div class="field"><label>Prioridade</label><select id="fPriority">${priorityOptions}</select></div>`;
@@ -217,6 +228,7 @@ export function openModal(editId, { onSaved } = {}) {
       toggleFreqFields(rule.frequency);
       dayTypeSel.value = rule.day_type;
       updateDayLabels();
+      document.getElementById('fCompetenceOffset').value = String(rule.competence_offset_months ?? 0);
 
       const dayVal = rule.day_of_month || 10;
       ['fDayMensal', 'fDayTri', 'fDayAnual'].forEach((id) => {
@@ -415,6 +427,7 @@ function readModalForm() {
     name, category, empresaNome, responsible, responsible_id, frequency, notes,
     module_key: document.getElementById('fModule').value,
     priority: document.getElementById('fPriority').value,
+    competence_offset_months: Math.max(0, Math.min(36, parseInt(document.getElementById('fCompetenceOffset').value, 10) || 0)),
     business_day_shift: document.getElementById('fBusinessDayShift')?.value || 'nenhum',
     day_type: document.getElementById('fDayType')?.value || 'fixo',
     sourceRuleId: document.getElementById('fUseRule')?.value || null,
