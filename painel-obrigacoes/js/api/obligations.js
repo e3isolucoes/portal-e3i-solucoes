@@ -3,12 +3,11 @@ import { withCurrentWorkspace, withCurrentWorkspaceMany } from './workspaceConte
 import { awsData, isAwsDataBackend } from './awsDataClient.js';
 
 // O data.js mantém uma lista explícita de campos do payload por compatibilidade
-// com o legado. A competência é uma configuração do formulário interativo e,
-// enquanto essa camada continua explícita, enriquecemos a escrita aqui. Chamadas
-// sem o modal aberto (importação, scripts e testes) permanecem inalteradas e
-// usam o comportamento retrocompatível de competência no mesmo mês.
+// com o legado. A competência nova é persistida no backend AWS atual. No rollback
+// Supabase não enviamos a coluna até existir uma migration equivalente, evitando
+// quebrar a reversão explícita por causa de um campo que a tabela antiga não tem.
 function withInteractiveCompetence(payload) {
-  if (typeof document === 'undefined') return payload;
+  if (!isAwsDataBackend() || typeof document === 'undefined') return payload;
   const field = document.getElementById('fCompetenceOffset');
   if (!field) return payload;
   const parsed = Number.parseInt(field.value, 10);
