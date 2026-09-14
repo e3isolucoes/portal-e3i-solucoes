@@ -2,6 +2,20 @@ import { supabase } from '../supabaseClient.js';
 import { withCurrentWorkspace, withCurrentWorkspaceMany } from './workspaceContext.js';
 import { awsData, isAwsDataBackend } from './awsDataClient.js';
 
+// O data.js mantém uma lista explícita de campos do payload por compatibilidade
+// com o legado. A competência é uma configuração do formulário interativo e,
+// enquanto essa camada continua explícita, enriquecemos a escrita aqui. Chamadas
+// sem o modal aberto (importação, scripts e testes) permanecem inalteradas e
+// usam o comportamento retrocompatível de competência no mesmo mês.
+function withInteractiveCompetence(payload) {
+  if (typeof document === 'undefined') return payload;
+  const field = document.getElementById('fCompetenceOffset');
+  if (!field) return payload;
+  const parsed = Number.parseInt(field.value, 10);
+  const competenceOffset = Number.isInteger(parsed) ? Math.max(0, Math.min(36, parsed)) : 0;
+  return { ...payload, competence_offset_months: competenceOffset };
+}
+
 export async function fetchObligations() {
   if (isAwsDataBackend()) return (await awsData.list('obligations')).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
   const { data, error } = await supabase.from('obligations').select('*').order('name');
@@ -12,12 +26,13 @@ export async function fetchObligations() {
 // `ob` já vem no formato de coluna do banco (day_of_month, due_date, etc.)
 // — ver js/ui/modal.js, função formToObligationPayload.
 export async function createObligation(ob) {
-  if (isAwsDataBackend()) return awsData.create('obligations', ob);
+  const payload = withInteractiveCompetence(ob);
+  if (isAwsDataBackend()) return awsData.create('obligations', payload);
   // A criação unitária é permitida a todo membro autenticado. Importações em
   // massa continuam usando a RPC restrita à Gestão.
   const { data, error } = await supabase
     .from('obligations')
-    .insert(withCurrentWorkspace(ob))
+    .insert(withCurrentWorkspace(payload))
     .select()
     .single();
   if (error) throw error;
@@ -58,8 +73,9 @@ export async function createObligationsBulk(obs) {
 }
 
 export async function updateObligation(id, patch) {
-  if (isAwsDataBackend()) return awsData.update('obligations', id, patch);
-  const { data, error } = await supabase.from('obligations').update(patch).eq('id', id).select().single();
+  const payload = withInteractiveCompetence(patch);
+  if (isAwsDataBackend()) return awsData.update('obligations', id, payload);
+  const { data, error } = await supabase.from('obligations').update(payload).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
