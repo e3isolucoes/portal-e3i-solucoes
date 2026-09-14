@@ -1,4 +1,5 @@
   // E3I_FIRST_LOGIN_PATCH_V1
+  const e3iCrypto = require("crypto");
   const E3I_FIRST_LOGIN_CODE_TTL_MINUTES = Math.max(5, Math.min(60, Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES || 30)));
   const E3I_FIRST_LOGIN_RESEND_COOLDOWN_MS = 60 * 1000;
   const E3I_FIRST_LOGIN_MAX_ATTEMPTS = 5;
@@ -19,7 +20,7 @@
   }
 
   function e3iHashSetupCode(code) {
-    return crypto.createHash("sha256").update(String(code)).digest("hex");
+    return e3iCrypto.createHash("sha256").update(String(code)).digest("hex");
   }
 
   function e3iClearPasswordSetup(user) {
@@ -39,7 +40,7 @@
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) throw new Error("PASSWORD_RESET_EMAIL_NOT_CONFIGURED");
 
-    const code = String(crypto.randomInt(100000, 1000000));
+    const code = String(e3iCrypto.randomInt(100000, 1000000));
     user.passwordSetupCodeHash = e3iHashSetupCode(code);
     user.passwordSetupExpiresAt = new Date(now + E3I_FIRST_LOGIN_CODE_TTL_MINUTES * 60 * 1000).toISOString();
     user.passwordSetupAttempts = 0;
@@ -111,14 +112,20 @@
 
     const expected = Buffer.from(String(user.passwordSetupCodeHash), "hex");
     const supplied = Buffer.from(e3iHashSetupCode(code), "hex");
-    const validCode = expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
+    const validCode = expected.length === supplied.length && e3iCrypto.timingSafeEqual(expected, supplied);
     if (!validCode) {
       user.passwordSetupAttempts = attempts + 1;
       saveStorage();
       return res.status(400).json({ error: "Código inválido.", code: "INVALID_CODE" });
     }
 
-    user.passwordHash = await passwordHasher.hash(newPassword);
+    const newHash = await passwordHasher.hash(newPassword);
+    if (!String(newHash || "").startsWith("$argon2")) {
+      console.error("[first-login] Argon2 hashing unavailable; refusing password downgrade");
+      return res.status(503).json({ error: "Não foi possível proteger a nova senha com o padrão de segurança exigido. Tente novamente em instantes.", code: "PASSWORD_HASH_UNAVAILABLE" });
+    }
+
+    user.passwordHash = newHash;
     user.mustChangePassword = false;
     user.passwordOnboardingVersion = 1;
     user.passwordChangedAt = new Date().toISOString();
