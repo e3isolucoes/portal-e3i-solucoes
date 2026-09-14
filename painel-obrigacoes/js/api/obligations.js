@@ -7,7 +7,7 @@ import { awsData, isAwsDataBackend } from './awsDataClient.js';
 // Supabase não enviamos a coluna até existir uma migration equivalente, evitando
 // quebrar a reversão explícita por causa de um campo que a tabela antiga não tem.
 function withInteractiveCompetence(payload) {
-  if (!isAwsDataBackend() || typeof document === 'undefined') return payload;
+  if (typeof document === 'undefined') return payload;
   const field = document.getElementById('fCompetenceOffset');
   if (!field) return payload;
   const parsed = Number.parseInt(field.value, 10);
@@ -25,13 +25,12 @@ export async function fetchObligations() {
 // `ob` já vem no formato de coluna do banco (day_of_month, due_date, etc.)
 // — ver js/ui/modal.js, função formToObligationPayload.
 export async function createObligation(ob) {
-  const payload = withInteractiveCompetence(ob);
-  if (isAwsDataBackend()) return awsData.create('obligations', payload);
+  if (isAwsDataBackend()) return awsData.create('obligations', withInteractiveCompetence(ob));
   // A criação unitária é permitida a todo membro autenticado. Importações em
   // massa continuam usando a RPC restrita à Gestão.
   const { data, error } = await supabase
     .from('obligations')
-    .insert(withCurrentWorkspace(payload))
+    .insert(withCurrentWorkspace(ob))
     .select()
     .single();
   if (error) throw error;
@@ -72,9 +71,8 @@ export async function createObligationsBulk(obs) {
 }
 
 export async function updateObligation(id, patch) {
-  const payload = withInteractiveCompetence(patch);
-  if (isAwsDataBackend()) return awsData.update('obligations', id, payload);
-  const { data, error } = await supabase.from('obligations').update(payload).eq('id', id).select().single();
+  if (isAwsDataBackend()) return awsData.update('obligations', id, withInteractiveCompetence(patch));
+  const { data, error } = await supabase.from('obligations').update(patch).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
