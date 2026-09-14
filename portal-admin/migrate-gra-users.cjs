@@ -8,6 +8,7 @@ const TARGETS = [
   { id: 'a1dcc1ef-859f-4e66-b4ac-55c70ed22bec', email: 'fiscal2@gracomercio.com.br', name: 'Carol' },
   { id: 'f8977e6f-f38c-4968-9ac4-61c31bf605dd', email: 'samea@gracomercio.com.br', name: 'Samea' },
   { id: '190ef281-def8-41da-aeb7-0d29d9a6c30d', email: 'marcomirandacoc@gmail.com', name: 'Marco Antonio Miranda' },
+  { id: '381b1106-b1a1-4cdd-a513-c69e25688425', email: 'marcoantoniomiranda713@gmail.com', name: 'Marco Antonio Miranda' },
   { id: 'bd05a0d4-74e3-419b-9585-16f403a6e5c3', email: 'daniela@gracomercio.com.br', name: 'Daniela Estoque Miranda' },
 ];
 
