@@ -16,16 +16,25 @@ function normalized(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function atomicWrite(file, data) {
-  const temporary = `${file}.${process.pid}.tmp`;
-  const descriptor = fs.openSync(temporary, 'w', 0o600);
+function durableWrite(file, content, flags = 'w') {
+  const descriptor = fs.openSync(file, flags, 0o600);
   try {
-    fs.writeFileSync(descriptor, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+    fs.writeFileSync(descriptor, content, 'utf8');
     fs.fsyncSync(descriptor);
   } finally {
     fs.closeSync(descriptor);
   }
-  fs.renameSync(temporary, file);
+}
+
+function atomicWrite(file, data) {
+  const temporary = `${file}.${process.pid}.tmp`;
+  try {
+    durableWrite(temporary, `${JSON.stringify(data, null, 2)}\n`);
+    fs.renameSync(temporary, file);
+  } catch (error) {
+    try { fs.rmSync(temporary, { force: true }); } catch {}
+    throw error;
+  }
 }
 
 if (!fs.existsSync(DATA_FILE)) {
@@ -33,7 +42,8 @@ if (!fs.existsSync(DATA_FILE)) {
   process.exit(2);
 }
 
-const dataset = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+const sourceContents = fs.readFileSync(DATA_FILE, 'utf8');
+const dataset = JSON.parse(sourceContents);
 const tables = dataset?.tables;
 const users = tables?.users?.data;
 const memberships = tables?.organization_memberships?.data;
@@ -144,8 +154,11 @@ if (changed) {
     path.dirname(DATA_FILE),
     `bigquery_dataset.json.before-first-login-${Date.now()}`,
   );
-  fs.copyFileSync(DATA_FILE, backup);
-  try { fs.chmodSync(backup, 0o600); } catch {}
+
+  // Azure Files pode retornar EPERM para copyFile/copy_file_range. Grave o snapshot
+  // pelos syscalls comuns de open/write/fsync, que são suportados pelo mesmo volume.
+  durableWrite(backup, sourceContents, 'wx');
+  console.log(`PORTAL_USER_BACKUP_OK ${backup}`);
 
   dataset.lastSyncAt = now;
   tables.users.rowsCount = users.length;
