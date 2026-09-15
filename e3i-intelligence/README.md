@@ -11,7 +11,7 @@ Na Sprint 1:
 - `E3I_INTELLIGENCE_ENABLED` nasce desligado;
 - não existe integração de escrita nas ferramentas atuais;
 - não existe agente com permissão de alteração;
-- o barramento de ingestão nasce `DISABLED`;
+- a ingestão nasce desabilitada;
 - nenhuma tabela ou endpoint atual é modificado;
 - o workflow desta pasta apenas valida; não faz deploy.
 
@@ -31,20 +31,20 @@ Todos os dados carregam proveniência. Informação medida, declarada, extraída
 - `contracts/mapping-v1.schema.json`
 - `contracts/saving-opportunity-v1.schema.json`
 
-## Infraestrutura proposta
+## Infraestrutura planejada
 
-`aws/template.yaml` define uma stack independente, sem vínculo com a stack do Painel de Obrigações:
+`foundation-manifest.json` descreve a stack futura de forma não executável e explicitamente sem deploy automático:
 
-- EventBridge dedicado;
-- fila SQS e DLQ criptografadas;
+- EventBus dedicado;
+- fila e DLQ;
 - Event Ledger;
 - Mapping Store;
 - Savings Ledger;
 - Audit Store;
-- bucket privado de evidências;
-- endpoint público somente de health.
+- armazenamento privado de evidências;
+- endpoint somente de health.
 
-A regra EventBridge nasce desabilitada. Não há produtor nem consumidor conectado nesta Sprint.
+Nenhum desses componentes está conectado às ferramentas atuais nesta Sprint.
 
 ## Segurança e LGPD
 
@@ -55,10 +55,8 @@ Consulte `docs/SECURITY-LGPD.md`. Os princípios obrigatórios são isolamento p
 ```bash
 cd e3i-intelligence
 npm test
-sam validate --lint --template-file aws/template.yaml
-sam build --template-file aws/template.yaml
 ```
 
 ## Próxima etapa
 
-Após revisão e validação desta fundação, a próxima PR deve implementar o Mapping Core autenticado e tenant-scoped. Só depois conectaremos o primeiro evento de uma ferramenta existente em shadow mode, com falha de telemetria incapaz de afetar a operação principal.
+Após revisão e validação desta fundação, a próxima PR deve implementar o Mapping Core autenticado e tenant-scoped em infraestrutura isolada. Só depois conectaremos o primeiro evento de uma ferramenta existente em shadow mode, com falha de telemetria incapaz de afetar a operação principal.
