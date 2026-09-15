@@ -3,35 +3,75 @@
   let currentEmail = '';
   let modal = null;
 
-  function syntheticJsonResponse(payload, status, statusText, sourceResponse) {
-    const headers = new Headers(sourceResponse?.headers || undefined);
-    headers.set('Content-Type', 'application/json; charset=utf-8');
-    return new Response(JSON.stringify(payload || {}), {
-      status,
-      statusText,
-      headers,
-    });
-  }
-
   function getRequestUrl(request) {
     if (typeof request === 'string') return request;
     if (request instanceof URL) return request.href;
     return request?.url || '';
   }
 
-  function applyLoginAutocomplete() {
-    document.querySelectorAll('form').forEach((form) => {
-      const passwordInput = form.querySelector('input[type="password"]:not([autocomplete])');
-      if (!passwordInput) return;
-      const identityInput = form.querySelector('input[type="email"], input[name*="email" i], input[autocomplete="username"]');
-      if (!identityInput) return;
-      if (!identityInput.hasAttribute('autocomplete')) identityInput.setAttribute('autocomplete', 'username');
-      passwordInput.setAttribute('autocomplete', 'current-password');
-    });
+  function getLoginFields(form) {
+    const passwordInput = form.querySelector('input[type="password"]');
+    if (!passwordInput) return null;
+    const identityInput = form.querySelector('input[type="email"], input[name*="email" i], input[autocomplete="username"], input[type="text"]');
+    if (!identityInput) return null;
+    return { identityInput, passwordInput };
+  }
+
+  async function requestFirstLogin(email, button) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) return false;
+    if (button) button.disabled = true;
+    try {
+      await nativeFetch('/api/auth/first-login/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      openFirstLogin(normalizedEmail);
+      const errorBox = modal?.querySelector('[data-e3i-error]');
+      if (errorBox) errorBox.textContent = 'Código solicitado. Verifique o e-mail informado.';
+      return true;
+    } catch {
+      window.alert('Não foi possível iniciar o primeiro acesso agora. Tente novamente.');
+      return false;
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  function enhanceLoginForm(form) {
+    const fields = getLoginFields(form);
+    if (!fields) return;
+    const { identityInput, passwordInput } = fields;
+
+    if (!identityInput.hasAttribute('autocomplete')) identityInput.setAttribute('autocomplete', 'username');
+    if (!passwordInput.hasAttribute('autocomplete')) passwordInput.setAttribute('autocomplete', 'current-password');
+
+    if (!form.querySelector('[data-e3i-first-login-start]')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'e3i-first-login-start';
+      button.dataset.e3iFirstLoginStart = 'true';
+      button.textContent = 'Primeiro acesso / definir nova senha';
+      button.addEventListener('click', async () => {
+        const email = String(identityInput.value || '').trim();
+        if (!email || !email.includes('@')) {
+          identityInput.focus();
+          window.alert('Informe primeiro o e-mail da conta.');
+          return;
+        }
+        await requestFirstLogin(email, button);
+      });
+      form.appendChild(button);
+    }
+  }
+
+  function enhanceLoginForms() {
+    document.querySelectorAll('form').forEach(enhanceLoginForm);
   }
 
   function watchLoginForm() {
-    const apply = () => applyLoginAutocomplete();
+    const apply = () => enhanceLoginForms();
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', apply, { once: true });
     } else {
@@ -152,39 +192,55 @@
     setTimeout(() => wrapper.querySelector('[data-e3i-code]').focus(), 0);
   }
 
+  function handleLoginPayload(status, payload) {
+    if (status === 428 && payload?.code === 'PASSWORD_CHANGE_REQUIRED' && payload?.email) {
+      queueMicrotask(() => openFirstLogin(payload.email));
+    }
+  }
+
+  function patchXmlHttpRequest() {
+    const Xhr = window.XMLHttpRequest;
+    if (!Xhr || Xhr.prototype.__e3iFirstLoginPatched) return;
+    const nativeOpen = Xhr.prototype.open;
+    const nativeSend = Xhr.prototype.send;
+
+    Xhr.prototype.open = function(method, url, ...rest) {
+      this.__e3iRequestUrl = String(url || '');
+      return nativeOpen.call(this, method, url, ...rest);
+    };
+
+    Xhr.prototype.send = function(...args) {
+      if (String(this.__e3iRequestUrl || '').includes('/api/auth/login')) {
+        this.addEventListener('load', () => {
+          if (this.status !== 428) return;
+          try {
+            handleLoginPayload(this.status, JSON.parse(this.responseText || '{}'));
+          } catch {
+            // O login principal continua tratando a resposta normalmente.
+          }
+        }, { once: true });
+      }
+      return nativeSend.apply(this, args);
+    };
+
+    Object.defineProperty(Xhr.prototype, '__e3iFirstLoginPatched', { value: true });
+  }
+
   watchLoginForm();
+  patchXmlHttpRequest();
 
   window.fetch = async (...args) => {
     const request = args[0];
     const url = getRequestUrl(request);
     const response = await nativeFetch(...args);
-
     try {
-      if (url.includes('/api/auth/login') && (response.status === 200 || response.status === 428)) {
+      if (url.includes('/api/auth/login') && response.status === 428) {
         const payload = await response.clone().json().catch(() => ({}));
-        if (payload?.code === 'PASSWORD_CHANGE_REQUIRED' && payload?.email) {
-          queueMicrotask(() => openFirstLogin(payload.email));
-          if (response.status === 200) {
-            return syntheticJsonResponse(payload, 428, 'Precondition Required', response);
-          }
-        }
-      }
-
-      if (url.includes('/api/auth/session') && response.status === 200) {
-        const payload = await response.clone().json().catch(() => ({}));
-        const noActiveSession = !payload?.user && (
-          payload?.code === 'INVALID_SESSION'
-          || payload?.code === 'NO_ACTIVE_SESSION'
-          || typeof payload?.error === 'string'
-        );
-        if (noActiveSession) {
-          return syntheticJsonResponse(payload, 401, 'Unauthorized', response);
-        }
+        handleLoginPayload(response.status, payload);
       }
     } catch {
-      // Mantém o contrato original de autenticação mesmo se o overlay não reconhecer a resposta.
+      // O login principal continua recebendo a resposta original.
     }
-
     return response;
   };
 })();
