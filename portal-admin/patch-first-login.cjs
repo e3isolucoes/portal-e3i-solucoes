@@ -15,6 +15,34 @@ function replaceOnce(source, needle, replacement, label) {
 
 let server = fs.readFileSync(SERVER, 'utf8');
 
+if (!server.includes('E3I_SESSION_PROBE_PATCH_V1')) {
+  const sessionMarker = 'app.get("/api/auth/session"';
+  const sessionProbe = [
+    '  // E3I_SESSION_PROBE_PATCH_V1',
+    '  // Anonymous startup is a normal state. Return 200 on the wire so the browser',
+    '  // does not report a failed resource; first-login.js translates it back to the',
+    '  // original 401 contract for the existing React authentication code.',
+    '  app.get("/api/auth/session", (req, res, next) => {',
+    '    const authHeader = req.headers.authorization;',
+    '    let token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;',
+    '    if (!token && req.headers.cookie) {',
+    '      const cookies = req.headers.cookie.split(";").map((value) => value.trim());',
+    '      const sessionCookie = cookies.find((value) => value.startsWith("e3i_token="));',
+    '      if (sessionCookie) token = sessionCookie.substring(10);',
+    '    }',
+    '    if (!token) {',
+    '      return res.status(200).json({',
+    '        code: "NO_ACTIVE_SESSION",',
+    '        error: "Sessão não autenticada.",',
+    '      });',
+    '    }',
+    '    return next();',
+    '  });',
+    '',
+  ].join('\n');
+  server = replaceOnce(server, sessionMarker, `${sessionProbe}${sessionMarker}`, 'session route');
+}
+
 if (!server.includes('E3I_FIRST_LOGIN_PATCH_V1')) {
   const loginMarker = 'app.post("/api/auth/login", async (req, res) => {';
   const helperBlock = fs.readFileSync(SERVER_SNIPPET, 'utf8');
@@ -36,7 +64,7 @@ if (!server.includes('E3I_FIRST_LOGIN_PATCH_V1')) {
     '      } catch (error) {',
     '        console.error("[first-login] initial code delivery failed", error instanceof Error ? error.message : error);',
     '      }',
-    '      return res.status(428).json({',
+    '      return res.status(200).json({',
     '        code: "PASSWORD_CHANGE_REQUIRED",',
     '        error: setupResult.sent || setupResult.throttled',
     '          ? "Primeiro acesso: defina uma nova senha usando o código enviado ao seu e-mail."',
@@ -48,8 +76,9 @@ if (!server.includes('E3I_FIRST_LOGIN_PATCH_V1')) {
 
   const patchedWindow = loginWindow.replace(lookupRegex, guard);
   server = server.slice(0, loginPosition) + patchedWindow + server.slice(loginWindowEnd);
-  fs.writeFileSync(SERVER, server, 'utf8');
 }
+
+fs.writeFileSync(SERVER, server, 'utf8');
 
 let index = fs.readFileSync(INDEX, 'utf8');
 if (!index.includes('/first-login.css')) {
@@ -64,7 +93,10 @@ fs.writeFileSync(INDEX, index, 'utf8');
 
 const patchedServer = fs.readFileSync(SERVER, 'utf8');
 const patchedIndex = fs.readFileSync(INDEX, 'utf8');
+if (!patchedServer.includes('E3I_SESSION_PROBE_PATCH_V1')) throw new Error('anonymous session probe validation failed');
+if (!patchedServer.includes('NO_ACTIVE_SESSION')) throw new Error('anonymous session payload validation failed');
 if (!patchedServer.includes('E3I_FIRST_LOGIN_PATCH_V1')) throw new Error('server onboarding helper validation failed');
 if (!patchedServer.includes('PASSWORD_CHANGE_REQUIRED')) throw new Error('server onboarding guard validation failed');
 if (!patchedIndex.includes('/first-login.js')) throw new Error('frontend onboarding injection validation failed');
+console.log('PORTAL_AUTH_CONSOLE_PATCH_OK');
 console.log('PORTAL_FIRST_LOGIN_PATCH_OK');
