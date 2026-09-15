@@ -100,13 +100,13 @@ fs.writeFileSync(INDEX, index, 'utf8');
 
 const patchedServer = fs.readFileSync(SERVER, 'utf8');
 const patchedIndex = fs.readFileSync(INDEX, 'utf8');
+const overlayScriptPosition = patchedIndex.indexOf('<script src="/first-login.js"></script>');
+const firstScriptPosition = patchedIndex.indexOf('<script');
 if (!patchedServer.includes('E3I_SESSION_PROBE_PATCH_V1')) throw new Error('anonymous session probe validation failed');
 if (!patchedServer.includes('NO_ACTIVE_SESSION')) throw new Error('anonymous session payload validation failed');
 if (!patchedServer.includes('E3I_FIRST_LOGIN_PATCH_V1')) throw new Error('server onboarding helper validation failed');
 if (!patchedServer.includes('PASSWORD_CHANGE_REQUIRED')) throw new Error('server onboarding guard validation failed');
-if (!patchedIndex.includes('/first-login.js')) throw new Error('frontend onboarding injection validation failed');
-if (patchedIndex.indexOf('/first-login.js') > patchedIndex.indexOf('<script', patchedIndex.indexOf('/first-login.js') + 1)) {
-  // There is at least one later script, which is the desired order. This branch is intentionally a no-op.
-}
+if (overlayScriptPosition < 0) throw new Error('frontend onboarding injection validation failed');
+if (firstScriptPosition !== overlayScriptPosition) throw new Error('auth overlay must load before application scripts');
 console.log('PORTAL_AUTH_CONSOLE_PATCH_OK');
 console.log('PORTAL_FIRST_LOGIN_PATCH_OK');
