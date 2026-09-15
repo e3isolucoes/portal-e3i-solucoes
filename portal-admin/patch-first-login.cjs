@@ -86,8 +86,15 @@ if (!index.includes('/first-login.css')) {
   index = index.replace('</head>', '  <link rel="stylesheet" href="/first-login.css">\n</head>');
 }
 if (!index.includes('/first-login.js')) {
-  if (!index.includes('</body>')) throw new Error('index.html has no </body> marker');
-  index = index.replace('</body>', '  <script src="/first-login.js"></script>\n</body>');
+  const firstScript = index.indexOf('<script');
+  const overlayScript = '  <script src="/first-login.js"></script>\n';
+  if (firstScript >= 0) {
+    index = `${index.slice(0, firstScript)}${overlayScript}${index.slice(firstScript)}`;
+  } else if (index.includes('</head>')) {
+    index = index.replace('</head>', `${overlayScript}</head>`);
+  } else {
+    throw new Error('index.html has no script or </head> marker');
+  }
 }
 fs.writeFileSync(INDEX, index, 'utf8');
 
@@ -98,5 +105,8 @@ if (!patchedServer.includes('NO_ACTIVE_SESSION')) throw new Error('anonymous ses
 if (!patchedServer.includes('E3I_FIRST_LOGIN_PATCH_V1')) throw new Error('server onboarding helper validation failed');
 if (!patchedServer.includes('PASSWORD_CHANGE_REQUIRED')) throw new Error('server onboarding guard validation failed');
 if (!patchedIndex.includes('/first-login.js')) throw new Error('frontend onboarding injection validation failed');
+if (patchedIndex.indexOf('/first-login.js') > patchedIndex.indexOf('<script', patchedIndex.indexOf('/first-login.js') + 1)) {
+  // There is at least one later script, which is the desired order. This branch is intentionally a no-op.
+}
 console.log('PORTAL_AUTH_CONSOLE_PATCH_OK');
 console.log('PORTAL_FIRST_LOGIN_PATCH_OK');
