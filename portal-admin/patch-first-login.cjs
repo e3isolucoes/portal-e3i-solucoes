@@ -57,26 +57,44 @@ if (!index.includes('/first-login.css')) {
   if (!index.includes('</head>')) throw new Error('index.html has no </head> marker');
   index = index.replace('</head>', '  <link rel="stylesheet" href="/first-login.css">\n</head>');
 }
-if (!index.includes('/first-login.js')) {
-  const firstScript = index.indexOf('<script');
-  const overlayScript = '  <script src="/first-login.js"></script>\n';
-  if (firstScript >= 0) {
-    index = `${index.slice(0, firstScript)}${overlayScript}${index.slice(firstScript)}`;
+
+const authBridgeTag = '<script src="/client-tool-auth.js"></script>';
+const firstLoginTag = '<script src="/first-login.js"></script>';
+
+if (!index.includes(authBridgeTag)) {
+  const firstLoginPosition = index.indexOf(firstLoginTag);
+  const firstScriptPosition = index.indexOf('<script');
+  const insertionPoint = firstLoginPosition >= 0 ? firstLoginPosition : firstScriptPosition;
+  const authBridgeScript = `  ${authBridgeTag}\n`;
+  if (insertionPoint >= 0) {
+    index = `${index.slice(0, insertionPoint)}${authBridgeScript}${index.slice(insertionPoint)}`;
   } else if (index.includes('</head>')) {
-    index = index.replace('</head>', `${overlayScript}</head>`);
+    index = index.replace('</head>', `${authBridgeScript}</head>`);
   } else {
-    throw new Error('index.html has no script or </head> marker');
+    throw new Error('index.html has no script or </head> marker for auth bridge');
   }
+}
+
+if (!index.includes(firstLoginTag)) {
+  const authBridgePosition = index.indexOf(authBridgeTag);
+  const insertionPoint = authBridgePosition + authBridgeTag.length;
+  if (authBridgePosition < 0) throw new Error('client-tool auth bridge must exist before first-login overlay');
+  index = `${index.slice(0, insertionPoint)}\n  ${firstLoginTag}${index.slice(insertionPoint)}`;
 }
 fs.writeFileSync(INDEX, index, 'utf8');
 
 const patchedServer = fs.readFileSync(SERVER, 'utf8');
 const patchedIndex = fs.readFileSync(INDEX, 'utf8');
-const overlayScriptPosition = patchedIndex.indexOf('<script src="/first-login.js"></script>');
+const authBridgeScriptPosition = patchedIndex.indexOf(authBridgeTag);
+const firstLoginScriptPosition = patchedIndex.indexOf(firstLoginTag);
 const firstScriptPosition = patchedIndex.indexOf('<script');
+const secondScriptPosition = patchedIndex.indexOf('<script', firstScriptPosition + 1);
 if (!patchedServer.includes('E3I_FIRST_LOGIN_PATCH_V1')) throw new Error('server onboarding helper validation failed');
 if (!patchedServer.includes('PASSWORD_CHANGE_REQUIRED')) throw new Error('server onboarding guard validation failed');
 if (!patchedServer.includes('res.status(428)')) throw new Error('first-login status validation failed');
-if (overlayScriptPosition < 0) throw new Error('frontend onboarding injection validation failed');
-if (firstScriptPosition !== overlayScriptPosition) throw new Error('auth overlay must load before application scripts');
+if (authBridgeScriptPosition < 0) throw new Error('client-tool auth bridge injection validation failed');
+if (firstLoginScriptPosition < 0) throw new Error('frontend onboarding injection validation failed');
+if (firstScriptPosition !== authBridgeScriptPosition) throw new Error('client-tool auth bridge must load before application scripts');
+if (secondScriptPosition !== firstLoginScriptPosition) throw new Error('first-login overlay must load immediately after auth bridge');
+console.log('PORTAL_CLIENT_TOOL_AUTH_PATCH_OK');
 console.log('PORTAL_FIRST_LOGIN_PATCH_OK');
