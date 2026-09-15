@@ -3,6 +3,44 @@
   let currentEmail = '';
   let modal = null;
 
+  function syntheticJsonResponse(payload, status, statusText, sourceResponse) {
+    const headers = new Headers(sourceResponse?.headers || undefined);
+    headers.set('Content-Type', 'application/json; charset=utf-8');
+    return new Response(JSON.stringify(payload || {}), {
+      status,
+      statusText,
+      headers,
+    });
+  }
+
+  function getRequestUrl(request) {
+    if (typeof request === 'string') return request;
+    if (request instanceof URL) return request.href;
+    return request?.url || '';
+  }
+
+  function applyLoginAutocomplete() {
+    document.querySelectorAll('form').forEach((form) => {
+      const passwordInput = form.querySelector('input[type="password"]:not([autocomplete])');
+      if (!passwordInput) return;
+      const identityInput = form.querySelector('input[type="email"], input[name*="email" i], input[autocomplete="username"]');
+      if (!identityInput) return;
+      if (!identityInput.hasAttribute('autocomplete')) identityInput.setAttribute('autocomplete', 'username');
+      passwordInput.setAttribute('autocomplete', 'current-password');
+    });
+  }
+
+  function watchLoginForm() {
+    const apply = () => applyLoginAutocomplete();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', apply, { once: true });
+    } else {
+      apply();
+    }
+    const observer = new MutationObserver(apply);
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
   function ensureModal() {
     if (modal) return modal;
     const wrapper = document.createElement('div');
@@ -114,20 +152,39 @@
     setTimeout(() => wrapper.querySelector('[data-e3i-code]').focus(), 0);
   }
 
+  watchLoginForm();
+
   window.fetch = async (...args) => {
+    const request = args[0];
+    const url = getRequestUrl(request);
     const response = await nativeFetch(...args);
+
     try {
-      const request = args[0];
-      const url = typeof request === 'string' ? request : request?.url || '';
-      if (url.includes('/api/auth/login') && response.status === 428) {
-        const payload = await response.clone().json();
+      if (url.includes('/api/auth/login') && (response.status === 200 || response.status === 428)) {
+        const payload = await response.clone().json().catch(() => ({}));
         if (payload?.code === 'PASSWORD_CHANGE_REQUIRED' && payload?.email) {
           queueMicrotask(() => openFirstLogin(payload.email));
+          if (response.status === 200) {
+            return syntheticJsonResponse(payload, 428, 'Precondition Required', response);
+          }
+        }
+      }
+
+      if (url.includes('/api/auth/session') && response.status === 200) {
+        const payload = await response.clone().json().catch(() => ({}));
+        const noActiveSession = !payload?.user && (
+          payload?.code === 'INVALID_SESSION'
+          || payload?.code === 'NO_ACTIVE_SESSION'
+          || typeof payload?.error === 'string'
+        );
+        if (noActiveSession) {
+          return syntheticJsonResponse(payload, 401, 'Unauthorized', response);
         }
       }
     } catch {
-      // A autenticação principal continua recebendo a resposta original.
+      // Mantém o contrato original de autenticação mesmo se o overlay não reconhecer a resposta.
     }
+
     return response;
   };
 })();
