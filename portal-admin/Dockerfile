@@ -23,16 +23,16 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq '/api/client-tools' /app/dist/admin-ferramentas.js \
  && grep -Fq '/api/admin/organizations/' /app/dist/admin-ferramentas.js \
  && grep -Fq 'admin-ferramentas.js' /app/dist/admin-ferramentas.html \
- && grep -Fq 'E3I_SESSION_PROBE_PATCH_V1' /app/dist/server.cjs \
- && grep -Fq 'NO_ACTIVE_SESSION' /app/dist/server.cjs \
  && grep -Fq 'PASSWORD_CHANGE_REQUIRED' /app/dist/server.cjs \
+ && grep -Fq 'res.status(428)' /app/dist/server.cjs \
  && grep -Fq '/api/auth/first-login/complete' /app/dist/server.cjs \
  && grep -Fq 'current-password' /app/dist/first-login.js \
- && grep -Fq 'syntheticJsonResponse' /app/dist/first-login.js \
+ && grep -Fq 'XMLHttpRequest' /app/dist/first-login.js \
+ && grep -Fq 'data-e3i-first-login-start' /app/dist/first-login.js \
  && grep -Fq '/first-login.js' /app/dist/index.html \
- && echo 'PORTAL_ADMIN_AUTH_VALIDATION_OK'
+ && echo 'PORTAL_FIRST_LOGIN_TRANSPORT_VALIDATION_OK'
 
 CMD ["sh", "-c", "node /app/migrate-gra-users.cjs && exec node /app/dist/server.cjs"]
 
-LABEL e3i.portal.feature="tool-access-admin,first-login-password,auth-console-noise" \
+LABEL e3i.portal.feature="tool-access-admin,first-login-password,first-login-transport" \
       e3i.portal.base-digest="sha256:04d63f77dbd8fef806a9b19601909b10901f2e8f0a4558df22a93bdeed4b3fb1"

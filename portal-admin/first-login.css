@@ -15,4 +15,8 @@
 .e3i-link-button{border:0;background:transparent;color:#8f6a11;padding:8px 4px}
 .e3i-primary-button{border:0;background:#8f6a11;color:#fff;padding:10px 16px}
 .e3i-link-button:disabled,.e3i-primary-button:disabled{opacity:.55;cursor:not-allowed}
+.e3i-first-login-start{width:100%;margin-top:8px;padding:8px 10px;border:0;background:transparent;color:#8f6a11;font:700 12px Arial,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.e3i-first-login-start:hover{color:#6f510a}
+.e3i-first-login-start:focus-visible{outline:2px solid #8f6a11;outline-offset:2px;border-radius:6px}
+.e3i-first-login-start:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:560px){.e3i-first-login-card{padding:22px}.e3i-first-login-actions{align-items:stretch;flex-direction:column-reverse}.e3i-link-button,.e3i-primary-button{width:100%}}
