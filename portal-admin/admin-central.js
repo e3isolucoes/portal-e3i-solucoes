@@ -8,54 +8,39 @@ const SAFE_DEFAULTS = Object.freeze({
     defaultRetentionClass: 'ANALYTICS_2Y',
     mappingPurposeId: 'process-mapping-v1',
   }),
-  governance: Object.freeze({
-    auditLevel: 'ENHANCED',
-    savingValidationRequired: true,
-  }),
+  governance: Object.freeze({ auditLevel: 'ENHANCED', savingValidationRequired: true }),
+});
+
+const TAB_META = Object.freeze({
+  overview: ['Visão geral', 'Governança central de identidade, acessos, segurança e parâmetros.'],
+  users: ['Usuários', 'Ciclo de vida de identidades e privilégios da organização ativa.'],
+  access: ['Acessos', 'Concessões de ferramentas e entitlements da organização.'],
+  parameters: ['Parâmetros', 'Configuração governada do E3I Intelligence.'],
+  security: ['Segurança', 'Controles ativos e evolução de identidade empresarial.'],
+  audit: ['Auditoria', 'Rastreabilidade das alterações administrativas.'],
 });
 
 const state = {
-  organizationId: '',
-  tools: [],
-  filter: '',
-  busyToolId: '',
-  settings: structuredClone(SAFE_DEFAULTS),
-  settingsVersion: 0,
-  settingsUpdatedAt: '',
-  audit: [],
-  settingsBusy: false,
+  organizationId: '', tools: [], users: [], toolFilter: '', userFilter: '', userStatus: '', userRole: '',
+  busyToolId: '', busyUserId: '', settings: structuredClone(SAFE_DEFAULTS), settingsVersion: 0,
+  settingsUpdatedAt: '', settingsAudit: [], adminEvents: [], settingsBusy: false,
 };
 
+const $ = (selector) => document.querySelector(selector);
 const els = {
-  organizationId: document.querySelector('#organizationId'),
-  settingsVersion: document.querySelector('#settingsVersion'),
-  metricTotal: document.querySelector('#metricTotal'),
-  metricGranted: document.querySelector('#metricGranted'),
-  metricIntelligence: document.querySelector('#metricIntelligence'),
-  metricIntelligenceHint: document.querySelector('#metricIntelligenceHint'),
-  metricUpdated: document.querySelector('#metricUpdated'),
-  globalStatus: document.querySelector('#globalStatus'),
-  toolsGrid: document.querySelector('#toolsGrid'),
-  searchInput: document.querySelector('#searchInput'),
-  tabs: [...document.querySelectorAll('[data-tab]')],
-  panels: [...document.querySelectorAll('[data-panel]')],
-  settingsForm: document.querySelector('#settingsForm'),
-  saveSettings: document.querySelector('#saveSettings'),
-  reloadSettings: document.querySelector('#reloadSettings'),
-  intelligenceEnabled: document.querySelector('#intelligenceEnabled'),
-  ingestionEnabled: document.querySelector('#ingestionEnabled'),
-  agentMode: document.querySelector('#agentMode'),
-  requireHumanApproval: document.querySelector('#requireHumanApproval'),
-  allowSensitivePersonalData: document.querySelector('#allowSensitivePersonalData'),
-  defaultRetentionClass: document.querySelector('#defaultRetentionClass'),
-  mappingPurposeId: document.querySelector('#mappingPurposeId'),
-  auditLevel: document.querySelector('#auditLevel'),
-  savingValidationRequired: document.querySelector('#savingValidationRequired'),
-  auditCount: document.querySelector('#auditCount'),
-  auditList: document.querySelector('#auditList'),
-  confirmDialog: document.querySelector('#confirmDialog'),
-  confirmTitle: document.querySelector('#confirmTitle'),
-  confirmMessage: document.querySelector('#confirmMessage'),
+  organizationId: $('#organizationId'), settingsVersion: $('#settingsVersion'), pageTitle: $('#pageTitle'), pageSubtitle: $('#pageSubtitle'),
+  globalStatus: $('#globalStatus'), tabs: [...document.querySelectorAll('[data-tab]')], panels: [...document.querySelectorAll('[data-panel]')],
+  metricUsers: $('#metricUsers'), metricUsersHint: $('#metricUsersHint'), metricAdmins: $('#metricAdmins'), metricGranted: $('#metricGranted'),
+  metricToolsHint: $('#metricToolsHint'), metricIntelligence: $('#metricIntelligence'), metricIntelligenceHint: $('#metricIntelligenceHint'),
+  usersTableBody: $('#usersTableBody'), usersEmpty: $('#usersEmpty'), userSearchInput: $('#userSearchInput'), userStatusFilter: $('#userStatusFilter'), userRoleFilter: $('#userRoleFilter'),
+  newUserButton: $('#newUserButton'), userDialog: $('#userDialog'), userForm: $('#userForm'), userDialogTitle: $('#userDialogTitle'), editingUserId: $('#editingUserId'),
+  userName: $('#userName'), userEmail: $('#userEmail'), userEmailHint: $('#userEmailHint'), userRole: $('#userRole'), sendInviteRow: $('#sendInviteRow'), sendInvite: $('#sendInvite'),
+  saveUser: $('#saveUser'), closeUserDialog: $('#closeUserDialog'), cancelUserDialog: $('#cancelUserDialog'),
+  toolsGrid: $('#toolsGrid'), searchInput: $('#searchInput'), settingsForm: $('#settingsForm'), saveSettings: $('#saveSettings'), reloadSettings: $('#reloadSettings'),
+  intelligenceEnabled: $('#intelligenceEnabled'), ingestionEnabled: $('#ingestionEnabled'), agentMode: $('#agentMode'), requireHumanApproval: $('#requireHumanApproval'),
+  allowSensitivePersonalData: $('#allowSensitivePersonalData'), defaultRetentionClass: $('#defaultRetentionClass'), mappingPurposeId: $('#mappingPurposeId'),
+  auditLevel: $('#auditLevel'), savingValidationRequired: $('#savingValidationRequired'), auditCount: $('#auditCount'), auditList: $('#auditList'), reloadAudit: $('#reloadAudit'),
+  confirmDialog: $('#confirmDialog'), confirmTitle: $('#confirmTitle'), confirmMessage: $('#confirmMessage'),
 };
 
 function setStatus(message = '', tone = '') {
@@ -64,26 +49,15 @@ function setStatus(message = '', tone = '') {
 }
 
 function formatDate(value) {
-  if (!value) return 'Nunca';
+  if (!value) return '—';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Indisponível';
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
-function toolLabel(tool) {
-  return tool.name || tool.title || tool.label || tool.id || 'Ferramenta';
-}
-
-function toolDescription(tool) {
-  return tool.description || tool.summary || 'Ferramenta disponível no catálogo do Portal E3I.';
-}
-
-function settingsEndpoint() {
-  if (!state.organizationId) throw new Error('Organização ativa não identificada');
-  return `/api/admin/organizations/${encodeURIComponent(state.organizationId)}/central-settings`;
+function endpoint(suffix) {
+  if (!state.organizationId) throw new Error('Organização ativa não identificada.');
+  return `/api/admin/organizations/${encodeURIComponent(state.organizationId)}${suffix}`;
 }
 
 async function readPayload(response) {
@@ -93,388 +67,198 @@ async function readPayload(response) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: 'same-origin',
-    headers: { accept: 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
+  const response = await fetch(path, { credentials: 'same-origin', headers: { accept: 'application/json', ...(options.headers || {}) }, ...options });
   const payload = await readPayload(response);
   if (!response.ok) {
     const error = new Error(payload.error || payload.message || `HTTP ${response.status}`);
-    error.status = response.status;
-    error.code = payload.code || '';
-    error.payload = payload;
+    error.status = response.status; error.code = payload.code || ''; error.payload = payload;
     throw error;
   }
   return payload;
 }
 
+function writeOptions(method, body) {
+  return { method, headers: { 'content-type': 'application/json', 'x-e3i-admin-request': '1' }, body: JSON.stringify(body ?? {}) };
+}
+
+function badge(text, kind = 'neutral') {
+  const element = document.createElement('span'); element.className = `badge ${kind}`; element.textContent = text; return element;
+}
+function button(text, className, handler, disabled = false) {
+  const element = document.createElement('button'); element.type = 'button'; element.className = `btn btn-small ${className}`; element.textContent = text; element.disabled = disabled; element.addEventListener('click', handler); return element;
+}
+function toolLabel(tool) { return tool.name || tool.title || tool.label || tool.id || 'Ferramenta'; }
+function toolDescription(tool) { return tool.description || tool.summary || 'Ferramenta disponível no catálogo do Portal E3I.'; }
+function userRoleLabel(role) { return role === 'E3I_ADMIN' ? 'Administrador' : 'Operador'; }
+
 function updateMetrics() {
-  const total = state.tools.length;
+  const activeUsers = state.users.filter((user) => user.status === 'ACTIVE').length;
+  const admins = state.users.filter((user) => user.status === 'ACTIVE' && user.role === 'E3I_ADMIN').length;
   const granted = state.tools.filter((tool) => Boolean(tool.granted)).length;
-  els.metricTotal.textContent = String(total);
-  els.metricGranted.textContent = String(granted);
+  els.metricUsers.textContent = String(activeUsers); els.metricUsersHint.textContent = `${state.users.length} cadastrados`;
+  els.metricAdmins.textContent = String(admins); els.metricGranted.textContent = String(granted); els.metricToolsHint.textContent = `${state.tools.length} ferramentas`;
   els.metricIntelligence.textContent = state.settings.intelligence.enabled ? 'Ativo' : 'Desligado';
-  els.metricIntelligenceHint.textContent = state.settings.intelligence.ingestionEnabled
-    ? 'ingestão habilitada'
-    : 'ingestão desligada';
-  els.metricUpdated.textContent = state.settingsUpdatedAt ? formatDate(state.settingsUpdatedAt) : 'Nunca';
+  els.metricIntelligenceHint.textContent = state.settings.intelligence.ingestionEnabled ? 'ingestão habilitada' : 'ingestão desligada';
   els.settingsVersion.textContent = `Configuração v${state.settingsVersion}`;
 }
 
-function makeBadge(granted) {
-  const badge = document.createElement('span');
-  badge.className = `badge ${granted ? 'granted' : 'blocked'}`;
-  badge.textContent = granted ? 'Acesso liberado' : 'Acesso bloqueado';
-  return badge;
-}
-
-function makeAccessButton(tool) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = `btn ${tool.granted ? 'btn-revoke' : 'btn-primary'}`;
-  button.textContent = state.busyToolId === tool.id
-    ? 'Salvando…'
-    : (tool.granted ? 'Revogar acesso' : 'Liberar acesso');
-  button.disabled = Boolean(state.busyToolId);
-  button.addEventListener('click', () => handleAccessChange(tool));
-  return button;
-}
-
-function renderTools() {
-  updateMetrics();
-  els.toolsGrid.replaceChildren();
-  els.toolsGrid.setAttribute('aria-busy', state.busyToolId ? 'true' : 'false');
-
-  const query = state.filter.trim().toLocaleLowerCase('pt-BR');
-  const visible = state.tools.filter((tool) => {
-    if (!query) return true;
-    return [toolLabel(tool), tool.id, toolDescription(tool)]
-      .filter(Boolean)
-      .some((value) => String(value).toLocaleLowerCase('pt-BR').includes(query));
-  });
-
-  if (!visible.length) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.textContent = state.tools.length
-      ? 'Nenhuma ferramenta corresponde à busca.'
-      : 'Nenhuma ferramenta está disponível para este contexto.';
-    els.toolsGrid.append(empty);
-    return;
-  }
-
-  visible.forEach((tool) => {
-    const card = document.createElement('article');
-    card.className = `tool-card${tool.granted ? ' is-granted' : ''}`;
-
-    const content = document.createElement('div');
-    const head = document.createElement('div');
-    head.className = 'tool-head';
-
-    const identity = document.createElement('div');
-    const title = document.createElement('h3');
-    title.className = 'tool-name';
-    title.textContent = toolLabel(tool);
-    const id = document.createElement('code');
-    id.className = 'tool-id';
-    id.textContent = tool.id || 'sem-identificador';
-    identity.append(title, id);
-    head.append(identity, makeBadge(Boolean(tool.granted)));
-
-    const description = document.createElement('p');
-    description.className = 'tool-description';
-    description.textContent = toolDescription(tool);
-    content.append(head, description);
-
-    const footer = document.createElement('div');
-    footer.className = 'tool-footer';
-    const accessCopy = document.createElement('span');
-    accessCopy.textContent = tool.granted
-      ? 'Usuários desta organização podem abrir a ferramenta.'
-      : 'A ferramenta não aparece para usuários sem concessão.';
-    footer.append(accessCopy, makeAccessButton(tool));
-
-    card.append(content, footer);
-    els.toolsGrid.append(card);
-  });
-}
-
-function normalizeSettings(payload) {
-  const candidate = payload && typeof payload === 'object' ? payload : {};
-  const intelligence = candidate.intelligence && typeof candidate.intelligence === 'object'
-    ? candidate.intelligence
-    : {};
-  const governance = candidate.governance && typeof candidate.governance === 'object'
-    ? candidate.governance
-    : {};
-
-  return {
-    intelligence: {
-      enabled: intelligence.enabled === true,
-      ingestionEnabled: intelligence.ingestionEnabled === true,
-      agentMode: intelligence.agentMode === 'READ_ONLY' ? 'READ_ONLY' : 'DISABLED',
-      requireHumanApproval: intelligence.requireHumanApproval !== false,
-      allowSensitivePersonalData: intelligence.allowSensitivePersonalData === true,
-      defaultRetentionClass: String(intelligence.defaultRetentionClass || SAFE_DEFAULTS.intelligence.defaultRetentionClass),
-      mappingPurposeId: String(intelligence.mappingPurposeId || SAFE_DEFAULTS.intelligence.mappingPurposeId),
-    },
-    governance: {
-      auditLevel: governance.auditLevel === 'STANDARD' ? 'STANDARD' : 'ENHANCED',
-      savingValidationRequired: governance.savingValidationRequired !== false,
-    },
-  };
-}
-
-function renderSettings() {
-  const { intelligence, governance } = state.settings;
-  els.intelligenceEnabled.checked = intelligence.enabled;
-  els.ingestionEnabled.checked = intelligence.ingestionEnabled;
-  els.agentMode.value = intelligence.agentMode;
-  els.requireHumanApproval.checked = intelligence.requireHumanApproval;
-  els.allowSensitivePersonalData.checked = intelligence.allowSensitivePersonalData;
-  els.defaultRetentionClass.value = intelligence.defaultRetentionClass;
-  els.mappingPurposeId.value = intelligence.mappingPurposeId;
-  els.auditLevel.value = governance.auditLevel;
-  els.savingValidationRequired.checked = governance.savingValidationRequired;
-  els.saveSettings.disabled = state.settingsBusy;
-  els.reloadSettings.disabled = state.settingsBusy;
-  updateMetrics();
-}
-
-function collectSettings() {
-  const mappingPurposeId = els.mappingPurposeId.value.trim();
-  if (!mappingPurposeId) throw new Error('Informe a finalidade padrão de mapeamento.');
-  if (mappingPurposeId.length > 120) throw new Error('A finalidade padrão excede 120 caracteres.');
-  if (/[@]|\d{3}\.\d{3}\.\d{3}/.test(mappingPurposeId)) {
-    throw new Error('Use apenas um identificador de finalidade, sem e-mail ou CPF.');
-  }
-
-  return {
-    intelligence: {
-      enabled: els.intelligenceEnabled.checked,
-      ingestionEnabled: els.ingestionEnabled.checked,
-      agentMode: els.agentMode.value,
-      requireHumanApproval: els.requireHumanApproval.checked,
-      allowSensitivePersonalData: els.allowSensitivePersonalData.checked,
-      defaultRetentionClass: els.defaultRetentionClass.value,
-      mappingPurposeId,
-    },
-    governance: {
-      auditLevel: els.auditLevel.value,
-      savingValidationRequired: els.savingValidationRequired.checked,
-    },
-  };
-}
-
-function renderAudit() {
-  els.auditList.replaceChildren();
-  const records = Array.isArray(state.audit) ? state.audit : [];
-  els.auditCount.textContent = `${records.length} ${records.length === 1 ? 'registro' : 'registros'}`;
-
-  if (!records.length) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.textContent = 'Ainda não há alterações de parametrização registradas para esta organização.';
-    els.auditList.append(empty);
-    return;
-  }
-
-  records.slice().reverse().forEach((record) => {
-    const item = document.createElement('article');
-    item.className = 'audit-item';
-    const text = document.createElement('div');
-    const title = document.createElement('strong');
-    title.textContent = `Configuração atualizada para v${record.version ?? '—'}`;
-    const detail = document.createElement('small');
-    const keys = Array.isArray(record.changedKeys) ? record.changedKeys.join(', ') : 'parâmetros governados';
-    detail.textContent = `${keys} · ator ${record.actorId || 'não identificado'}`;
-    text.append(title, detail);
-    const time = document.createElement('time');
-    time.dateTime = record.occurredAt || '';
-    time.textContent = formatDate(record.occurredAt);
-    item.append(text, time);
-    els.auditList.append(item);
-  });
-}
-
 function switchTab(tabName) {
-  els.tabs.forEach((tab) => {
-    const active = tab.dataset.tab === tabName;
-    tab.classList.toggle('is-active', active);
-    tab.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
-  els.panels.forEach((panel) => {
-    panel.hidden = panel.dataset.panel !== tabName;
-  });
+  if (!TAB_META[tabName]) return;
+  els.tabs.forEach((tab) => { const active = tab.dataset.tab === tabName; tab.classList.toggle('is-active', active); tab.setAttribute('aria-selected', active ? 'true' : 'false'); });
+  els.panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== tabName; });
+  [els.pageTitle.textContent, els.pageSubtitle.textContent] = TAB_META[tabName];
 }
 
 function confirmAction({ title, message, danger = false }) {
   if (!els.confirmDialog?.showModal) return Promise.resolve(window.confirm(message));
-  els.confirmTitle.textContent = title;
-  els.confirmMessage.textContent = message;
+  els.confirmTitle.textContent = title; els.confirmMessage.textContent = message;
   const confirmButton = els.confirmDialog.querySelector('button[value="confirm"]');
   confirmButton.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
   els.confirmDialog.showModal();
-  return new Promise((resolve) => {
-    els.confirmDialog.addEventListener('close', () => resolve(els.confirmDialog.returnValue === 'confirm'), { once: true });
+  return new Promise((resolve) => els.confirmDialog.addEventListener('close', () => resolve(els.confirmDialog.returnValue === 'confirm'), { once: true }));
+}
+
+function renderUsers() {
+  updateMetrics(); els.usersTableBody.replaceChildren();
+  const query = state.userFilter.trim().toLocaleLowerCase('pt-BR');
+  const visible = state.users.filter((user) => {
+    if (state.userStatus && user.status !== state.userStatus) return false;
+    if (state.userRole && user.role !== state.userRole) return false;
+    return !query || [user.name, user.email].some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(query));
+  });
+  els.usersEmpty.hidden = visible.length !== 0;
+  visible.forEach((user) => {
+    const row = document.createElement('tr');
+    const identityCell = document.createElement('td'); const identity = document.createElement('div'); identity.className = 'user-identity';
+    const name = document.createElement('strong'); name.textContent = user.name || 'Sem nome'; const email = document.createElement('small'); email.textContent = user.email || '—'; identity.append(name, email); identityCell.append(identity);
+    const roleCell = document.createElement('td'); roleCell.append(badge(userRoleLabel(user.role), user.role === 'E3I_ADMIN' ? 'admin' : 'neutral'));
+    const statusCell = document.createElement('td'); statusCell.append(badge(user.status === 'ACTIVE' ? 'Ativo' : 'Suspenso', user.status === 'ACTIVE' ? 'active' : 'disabled'));
+    const securityCell = document.createElement('td'); securityCell.append(badge(user.mustChangePassword ? 'Primeiro acesso pendente' : 'Senha definida', user.mustChangePassword ? 'pending' : 'active'));
+    const sessionCell = document.createElement('td'); sessionCell.textContent = String(user.activeSessions ?? 0);
+    const actionsCell = document.createElement('td'); actionsCell.className = 'actions-column'; const actions = document.createElement('div'); actions.className = 'row-actions';
+    const busy = state.busyUserId === user.id;
+    actions.append(button('Editar', 'btn-secondary', () => openUserDialog(user), busy));
+    actions.append(button('Sessões', 'btn-secondary', () => revokeSessions(user), busy || user.isCurrentActor));
+    actions.append(button('Redefinir', 'btn-secondary', () => requireFirstLogin(user), busy || user.isCurrentActor || user.status !== 'ACTIVE'));
+    if (user.status === 'ACTIVE') actions.append(button('Suspender', 'btn-revoke', () => changeUserStatus(user, 'DISABLED'), busy || user.isCurrentActor));
+    else actions.append(button('Reativar', 'btn-primary', () => changeUserStatus(user, 'ACTIVE'), busy));
+    actionsCell.append(actions); row.append(identityCell, roleCell, statusCell, securityCell, sessionCell, actionsCell); els.usersTableBody.append(row);
   });
 }
 
+function openUserDialog(user = null) {
+  const editing = Boolean(user);
+  els.userDialogTitle.textContent = editing ? 'Editar usuário' : 'Novo usuário'; els.editingUserId.value = user?.id || '';
+  els.userName.value = user?.name || ''; els.userEmail.value = user?.email || ''; els.userEmail.disabled = editing;
+  els.userEmailHint.textContent = editing ? 'E-mail é a chave de identidade e não pode ser alterado aqui.' : 'O e-mail será usado como identidade de acesso.';
+  els.userRole.value = user?.role === 'E3I_ADMIN' ? 'E3I_ADMIN' : 'OPERATOR'; els.sendInviteRow.hidden = editing; els.sendInvite.checked = true;
+  els.saveUser.textContent = editing ? 'Salvar alterações' : 'Criar usuário'; els.userDialog.showModal(); setTimeout(() => els.userName.focus(), 0);
+}
+function closeUserDialog() { if (els.userDialog.open) els.userDialog.close(); }
+
+async function saveUser(event) {
+  event.preventDefault();
+  const id = els.editingUserId.value; const name = els.userName.value.trim(); const email = els.userEmail.value.trim().toLowerCase(); const role = els.userRole.value;
+  if (name.length < 2) return setStatus('Informe um nome válido para o usuário.', 'error');
+  if (!id && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setStatus('Informe um e-mail válido.', 'error');
+  els.saveUser.disabled = true;
+  try {
+    if (id) await api(endpoint(`/users/${encodeURIComponent(id)}`), writeOptions('PATCH', { name, role }));
+    else await api(endpoint('/users'), writeOptions('POST', { name, email, role, sendInvite: els.sendInvite.checked }));
+    closeUserDialog(); await Promise.all([loadUsers(), loadAdminEvents()]); setStatus(id ? 'Usuário atualizado com sucesso.' : 'Usuário criado com primeiro acesso seguro.', 'success');
+  } catch (error) { setStatus(error.message, 'error'); } finally { els.saveUser.disabled = false; }
+}
+
+async function changeUserStatus(user, status) {
+  const disabling = status === 'DISABLED';
+  if (!(await confirmAction({ title: disabling ? 'Suspender usuário?' : 'Reativar usuário?', message: disabling ? `O acesso de ${user.name} será suspenso e suas sessões serão revogadas.` : `O acesso de ${user.name} será reativado.`, danger: disabling }))) return;
+  state.busyUserId = user.id; renderUsers();
+  try { await api(endpoint(`/users/${encodeURIComponent(user.id)}/status`), writeOptions('POST', { status })); await Promise.all([loadUsers(), loadAdminEvents()]); setStatus(disabling ? 'Usuário suspenso.' : 'Usuário reativado.', 'success'); }
+  catch (error) { setStatus(error.message, 'error'); } finally { state.busyUserId = ''; renderUsers(); }
+}
+async function revokeSessions(user) {
+  if (!(await confirmAction({ title: 'Revogar sessões?', message: `Todas as sessões ativas de ${user.name} serão encerradas.`, danger: true }))) return;
+  state.busyUserId = user.id; renderUsers();
+  try { const payload = await api(endpoint(`/users/${encodeURIComponent(user.id)}/revoke-sessions`), writeOptions('POST', {})); await Promise.all([loadUsers(), loadAdminEvents()]); setStatus(`${payload.revokedSessions ?? 0} sessão(ões) revogada(s).`, 'success'); }
+  catch (error) { setStatus(error.message, 'error'); } finally { state.busyUserId = ''; renderUsers(); }
+}
+async function requireFirstLogin(user) {
+  if (!(await confirmAction({ title: 'Exigir nova definição de senha?', message: `${user.name} terá as sessões revogadas e precisará concluir novamente o fluxo seguro por código de e-mail.`, danger: true }))) return;
+  state.busyUserId = user.id; renderUsers();
+  try { await api(endpoint(`/users/${encodeURIComponent(user.id)}/require-first-login`), writeOptions('POST', { sendCode: true })); await Promise.all([loadUsers(), loadAdminEvents()]); setStatus('Novo primeiro acesso exigido. O envio do código foi solicitado.', 'success'); }
+  catch (error) { setStatus(error.message, 'error'); } finally { state.busyUserId = ''; renderUsers(); }
+}
+
+function renderTools() {
+  updateMetrics(); els.toolsGrid.replaceChildren(); const query = state.toolFilter.trim().toLocaleLowerCase('pt-BR');
+  const visible = state.tools.filter((tool) => !query || [toolLabel(tool), tool.id, toolDescription(tool)].filter(Boolean).some((value) => String(value).toLocaleLowerCase('pt-BR').includes(query)));
+  if (!visible.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = state.tools.length ? 'Nenhuma ferramenta corresponde à busca.' : 'Nenhuma ferramenta disponível.'; els.toolsGrid.append(empty); return; }
+  visible.forEach((tool) => {
+    const card = document.createElement('article'); card.className = `tool-card${tool.granted ? ' is-granted' : ''}`;
+    const content = document.createElement('div'); const head = document.createElement('div'); head.className = 'tool-head'; const identity = document.createElement('div');
+    const title = document.createElement('h3'); title.className = 'tool-name'; title.textContent = toolLabel(tool); const id = document.createElement('code'); id.className = 'tool-id'; id.textContent = tool.id || 'sem-identificador'; identity.append(title, id); head.append(identity, badge(tool.granted ? 'Liberado' : 'Bloqueado', tool.granted ? 'granted' : 'blocked'));
+    const description = document.createElement('p'); description.className = 'tool-description'; description.textContent = toolDescription(tool); content.append(head, description);
+    const footer = document.createElement('div'); footer.className = 'tool-footer'; const copy = document.createElement('span'); copy.textContent = tool.granted ? 'Organização autorizada a abrir a ferramenta.' : 'Ferramenta não concedida à organização.';
+    const action = document.createElement('button'); action.type = 'button'; action.className = `btn ${tool.granted ? 'btn-revoke' : 'btn-primary'}`; action.textContent = state.busyToolId === tool.id ? 'Salvando…' : (tool.granted ? 'Revogar acesso' : 'Liberar acesso'); action.disabled = Boolean(state.busyToolId); action.addEventListener('click', () => handleAccessChange(tool)); footer.append(copy, action); card.append(content, footer); els.toolsGrid.append(card);
+  });
+}
 async function handleAccessChange(tool) {
   if (!state.organizationId || !tool.id || state.busyToolId) return;
-  if (tool.granted) {
-    const confirmed = await confirmAction({
-      title: 'Revogar acesso?',
-      message: `A organização ativa deixará de ter acesso a “${toolLabel(tool)}”.`,
-      danger: true,
-    });
-    if (!confirmed) return;
-  }
-
-  state.busyToolId = tool.id;
-  setStatus(tool.granted ? 'Revogando acesso…' : 'Liberando acesso…');
-  renderTools();
-
-  const path = `/api/admin/organizations/${encodeURIComponent(state.organizationId)}/client-tools/${encodeURIComponent(tool.id)}`;
-  try {
-    await api(path, { method: tool.granted ? 'DELETE' : 'PUT' });
-    tool.granted = !tool.granted;
-    setStatus(
-      tool.granted
-        ? `Acesso a “${toolLabel(tool)}” liberado com sucesso.`
-        : `Acesso a “${toolLabel(tool)}” revogado com sucesso.`,
-      'success',
-    );
-  } catch (error) {
-    if (error.status === 403) {
-      setStatus('Somente a administração E3I pode alterar os acessos.', 'error');
-    } else if (error.status === 401) {
-      setStatus('Sua sessão expirou. Entre novamente no Portal E3I.', 'error');
-    } else {
-      setStatus(`Não foi possível alterar o acesso: ${error.message}`, 'error');
-    }
-  } finally {
-    state.busyToolId = '';
-    renderTools();
-  }
+  if (tool.granted && !(await confirmAction({ title: 'Revogar acesso?', message: `A organização deixará de ter acesso a “${toolLabel(tool)}”.`, danger: true }))) return;
+  state.busyToolId = tool.id; renderTools();
+  try { await api(endpoint(`/client-tools/${encodeURIComponent(tool.id)}`), { method: tool.granted ? 'DELETE' : 'PUT' }); tool.granted = !tool.granted; setStatus(tool.granted ? 'Acesso liberado.' : 'Acesso revogado.', 'success'); }
+  catch (error) { setStatus(error.message, 'error'); } finally { state.busyToolId = ''; renderTools(); }
 }
 
-async function loadTools() {
-  els.toolsGrid.setAttribute('aria-busy', 'true');
-  const payload = await api('/api/client-tools');
-  state.organizationId = payload.organizationId || '';
-  state.tools = Array.isArray(payload.tools) ? payload.tools : [];
-  els.organizationId.textContent = state.organizationId || 'Não identificada';
-  renderTools();
-  els.toolsGrid.setAttribute('aria-busy', 'false');
-  if (!state.organizationId) throw new Error('O Portal não informou a organização ativa.');
+function normalizeSettings(candidate = {}) {
+  const intelligence = candidate.intelligence || {}, governance = candidate.governance || {};
+  return { intelligence: { enabled: intelligence.enabled === true, ingestionEnabled: intelligence.ingestionEnabled === true, agentMode: intelligence.agentMode === 'READ_ONLY' ? 'READ_ONLY' : 'DISABLED', requireHumanApproval: intelligence.requireHumanApproval !== false, allowSensitivePersonalData: intelligence.allowSensitivePersonalData === true, defaultRetentionClass: String(intelligence.defaultRetentionClass || SAFE_DEFAULTS.intelligence.defaultRetentionClass), mappingPurposeId: String(intelligence.mappingPurposeId || SAFE_DEFAULTS.intelligence.mappingPurposeId) }, governance: { auditLevel: governance.auditLevel === 'STANDARD' ? 'STANDARD' : 'ENHANCED', savingValidationRequired: governance.savingValidationRequired !== false } };
 }
-
-async function loadSettings({ announce = false } = {}) {
-  if (!state.organizationId) return;
-  state.settingsBusy = true;
-  renderSettings();
-  if (announce) setStatus('Recarregando parâmetros…');
-  try {
-    const payload = await api(settingsEndpoint());
-    state.settings = normalizeSettings(payload.settings);
-    state.settingsVersion = Number.isInteger(payload.version) ? payload.version : 0;
-    state.settingsUpdatedAt = payload.updatedAt || '';
-    state.audit = Array.isArray(payload.audit) ? payload.audit : [];
-    renderSettings();
-    renderAudit();
-    if (announce) setStatus('Parâmetros recarregados.', 'success');
-  } catch (error) {
-    if (error.status === 403) {
-      setStatus('Esta tela de parametrização é exclusiva para administradores E3I.', 'error');
-    } else if (error.status === 401) {
-      setStatus('Sua sessão expirou. Entre novamente no Portal E3I.', 'error');
-    } else {
-      setStatus(`Não foi possível carregar os parâmetros: ${error.message}`, 'error');
-    }
-    throw error;
-  } finally {
-    state.settingsBusy = false;
-    renderSettings();
-  }
+function renderSettings() {
+  const { intelligence, governance } = state.settings; els.intelligenceEnabled.checked = intelligence.enabled; els.ingestionEnabled.checked = intelligence.ingestionEnabled; els.agentMode.value = intelligence.agentMode; els.requireHumanApproval.checked = intelligence.requireHumanApproval; els.allowSensitivePersonalData.checked = intelligence.allowSensitivePersonalData; els.defaultRetentionClass.value = intelligence.defaultRetentionClass; els.mappingPurposeId.value = intelligence.mappingPurposeId; els.auditLevel.value = governance.auditLevel; els.savingValidationRequired.checked = governance.savingValidationRequired; els.saveSettings.disabled = state.settingsBusy; els.reloadSettings.disabled = state.settingsBusy; updateMetrics();
 }
-
+function collectSettings() {
+  const purpose = els.mappingPurposeId.value.trim(); if (!purpose || purpose.length > 120 || /[@]|\d{3}\.\d{3}\.\d{3}/.test(purpose)) throw new Error('Use um identificador de finalidade válido, sem dado pessoal.');
+  return { intelligence: { enabled: els.intelligenceEnabled.checked, ingestionEnabled: els.ingestionEnabled.checked, agentMode: els.agentMode.value, requireHumanApproval: els.requireHumanApproval.checked, allowSensitivePersonalData: els.allowSensitivePersonalData.checked, defaultRetentionClass: els.defaultRetentionClass.value, mappingPurposeId: purpose }, governance: { auditLevel: els.auditLevel.value, savingValidationRequired: els.savingValidationRequired.checked } };
+}
 async function saveSettings() {
-  if (state.settingsBusy || !state.organizationId) return;
-  let next;
-  try {
-    next = collectSettings();
-  } catch (error) {
-    setStatus(error.message, 'error');
-    return;
-  }
+  let settings; try { settings = collectSettings(); } catch (error) { return setStatus(error.message, 'error'); }
+  if (settings.intelligence.allowSensitivePersonalData && !(await confirmAction({ title: 'Permitir dados sensíveis?', message: 'Esta alteração amplia a categoria de dados autorizada. Confirme apenas se houver finalidade, base legal e controles aprovados.', danger: true }))) return;
+  state.settingsBusy = true; renderSettings();
+  try { const payload = await api(endpoint('/central-settings'), writeOptions('PUT', { expectedVersion: state.settingsVersion, settings })); applySettingsPayload(payload); renderAudit(); setStatus('Parâmetros salvos.', 'success'); }
+  catch (error) { if (error.status === 409) await loadSettings(); setStatus(error.status === 409 ? 'Configuração alterada por outra sessão. Dados recarregados; revise antes de salvar.' : error.message, 'error'); }
+  finally { state.settingsBusy = false; renderSettings(); }
+}
+function applySettingsPayload(payload) { state.settings = normalizeSettings(payload.settings); state.settingsVersion = Number.isInteger(payload.version) ? payload.version : 0; state.settingsUpdatedAt = payload.updatedAt || ''; state.settingsAudit = Array.isArray(payload.audit) ? payload.audit : []; renderSettings(); }
 
-  if (next.intelligence.allowSensitivePersonalData && !state.settings.intelligence.allowSensitivePersonalData) {
-    const confirmed = await confirmAction({
-      title: 'Permitir dados sensíveis?',
-      message: 'Esta alteração amplia a classificação de dados admitida. Confirme somente se existe governança, finalidade e base legal aprovadas.',
-      danger: true,
-    });
-    if (!confirmed) {
-      renderSettings();
-      return;
-    }
-  }
-
-  state.settingsBusy = true;
-  renderSettings();
-  setStatus('Salvando parâmetros com controle de versão…');
-  try {
-    const payload = await api(settingsEndpoint(), {
-      method: 'PUT',
-      headers: {
-        'content-type': 'application/json',
-        'x-e3i-admin-request': '1',
-      },
-      body: JSON.stringify({ expectedVersion: state.settingsVersion, settings: next }),
-    });
-    state.settings = normalizeSettings(payload.settings);
-    state.settingsVersion = Number.isInteger(payload.version) ? payload.version : state.settingsVersion + 1;
-    state.settingsUpdatedAt = payload.updatedAt || new Date().toISOString();
-    state.audit = Array.isArray(payload.audit) ? payload.audit : state.audit;
-    renderAudit();
-    setStatus('Parâmetros salvos com sucesso. As ferramentas atuais permanecem inalteradas.', 'success');
-  } catch (error) {
-    if (error.status === 409) {
-      setStatus('A configuração foi alterada em outra sessão. Recarregue antes de salvar novamente.', 'warning');
-    } else if (error.status === 403) {
-      setStatus('A alteração foi bloqueada pela política de administração do Portal.', 'error');
-    } else {
-      setStatus(`Não foi possível salvar os parâmetros: ${error.message}`, 'error');
-    }
-  } finally {
-    state.settingsBusy = false;
-    renderSettings();
-  }
+function renderAudit() {
+  els.auditList.replaceChildren();
+  const settingsEvents = state.settingsAudit.map((event) => ({ type: 'settings', action: 'Parâmetros atualizados', detail: Array.isArray(event.changedKeys) ? event.changedKeys.join(', ') : 'configuração governada', actorId: event.actorId, occurredAt: event.occurredAt }));
+  const records = [...state.adminEvents, ...settingsEvents].sort((a, b) => String(b.occurredAt || '').localeCompare(String(a.occurredAt || ''))).slice(0, 100);
+  els.auditCount.textContent = `${records.length} ${records.length === 1 ? 'registro' : 'registros'}`;
+  if (!records.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = 'Ainda não há eventos administrativos para esta organização.'; els.auditList.append(empty); return; }
+  records.forEach((record) => { const item = document.createElement('article'); item.className = 'audit-item'; const text = document.createElement('div'); const title = document.createElement('strong'); title.textContent = record.label || record.action || 'Evento administrativo'; const detail = document.createElement('small'); detail.textContent = `${record.detail || 'metadados administrativos'} · ator ${record.actorId || 'não identificado'}`; text.append(title, detail); const time = document.createElement('time'); time.dateTime = record.occurredAt || ''; time.textContent = formatDate(record.occurredAt); item.append(text, time); els.auditList.append(item); });
 }
 
-async function bootstrap() {
-  setStatus('Carregando administração central…');
-  try {
-    await loadTools();
-    await loadSettings();
-    setStatus('');
-  } catch (error) {
-    if (error.status === 401) {
-      setStatus('Sua sessão expirou. Volte ao Portal E3I e entre novamente.', 'error');
-    } else if (!els.globalStatus.textContent) {
-      setStatus(`Não foi possível iniciar a administração central: ${error.message}`, 'error');
-    }
-  }
+async function loadTools() { const payload = await api('/api/client-tools'); state.organizationId = payload.organizationId || ''; state.tools = Array.isArray(payload.tools) ? payload.tools : []; els.organizationId.textContent = state.organizationId || 'Não identificada'; if (!state.organizationId) throw new Error('O Portal não informou a organização ativa.'); renderTools(); }
+async function loadUsers() { const payload = await api(endpoint('/users')); state.users = Array.isArray(payload.users) ? payload.users : []; renderUsers(); }
+async function loadSettings() { state.settingsBusy = true; renderSettings(); try { applySettingsPayload(await api(endpoint('/central-settings'))); } finally { state.settingsBusy = false; renderSettings(); } }
+async function loadAdminEvents() { const payload = await api(endpoint('/admin-events')); state.adminEvents = Array.isArray(payload.events) ? payload.events : []; renderAudit(); }
+
+async function boot() {
+  setStatus('Carregando console administrativo…');
+  try { await loadTools(); await Promise.all([loadUsers(), loadSettings(), loadAdminEvents()]); setStatus(''); }
+  catch (error) { if (error.status === 401) setStatus('Sua sessão expirou. Entre novamente no Portal E3I.', 'error'); else if (error.status === 403) setStatus('Esta área é exclusiva para administradores E3I.', 'error'); else setStatus(`Não foi possível carregar o console: ${error.message}`, 'error'); }
 }
 
 els.tabs.forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
-els.searchInput.addEventListener('input', (event) => {
-  state.filter = event.target.value || '';
-  renderTools();
-});
-els.saveSettings.addEventListener('click', saveSettings);
-els.reloadSettings.addEventListener('click', () => loadSettings({ announce: true }).catch(() => {}));
+document.querySelectorAll('[data-open-tab]').forEach((buttonEl) => buttonEl.addEventListener('click', () => switchTab(buttonEl.dataset.openTab)));
+els.userSearchInput.addEventListener('input', (event) => { state.userFilter = event.target.value || ''; renderUsers(); });
+els.userStatusFilter.addEventListener('change', (event) => { state.userStatus = event.target.value || ''; renderUsers(); });
+els.userRoleFilter.addEventListener('change', (event) => { state.userRole = event.target.value || ''; renderUsers(); });
+els.searchInput.addEventListener('input', (event) => { state.toolFilter = event.target.value || ''; renderTools(); });
+els.newUserButton.addEventListener('click', () => openUserDialog()); els.userForm.addEventListener('submit', saveUser); els.closeUserDialog.addEventListener('click', closeUserDialog); els.cancelUserDialog.addEventListener('click', closeUserDialog);
+els.saveSettings.addEventListener('click', saveSettings); els.reloadSettings.addEventListener('click', async () => { try { await loadSettings(); renderAudit(); setStatus('Parâmetros recarregados.', 'success'); } catch (error) { setStatus(error.message, 'error'); } });
+els.reloadAudit.addEventListener('click', async () => { try { await Promise.all([loadSettings(), loadAdminEvents()]); setStatus('Auditoria atualizada.', 'success'); } catch (error) { setStatus(error.message, 'error'); } });
 
-bootstrap();
+boot();
