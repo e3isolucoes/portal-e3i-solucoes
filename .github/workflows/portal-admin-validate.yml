@@ -1,0 +1,48 @@
+name: Portal Admin Central Validate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'portal-admin/**'
+      - '.github/workflows/portal-admin-validate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'portal-admin/**'
+      - '.github/workflows/portal-admin-validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Check admin JavaScript syntax
+        run: |
+          node --check portal-admin/admin-central.js
+          node --check portal-admin/patch-admin-central.cjs
+          node --check portal-admin/test-admin-central.cjs
+          node --check portal-admin/admin-ferramentas.js
+      - name: Validate central admin contracts and patch fixture
+        env:
+          E3I_ADMIN_DIR: ${{ github.workspace }}/portal-admin
+          E3I_ADMIN_PATCH_SCRIPT: ${{ github.workspace }}/portal-admin/patch-admin-central.cjs
+          E3I_ADMIN_SNIPPET: ${{ github.workspace }}/portal-admin/admin-central-server-snippet.txt
+        run: node portal-admin/test-admin-central.cjs
+      - name: Publish QA summary
+        run: |
+          {
+            echo '### Portal Admin Central'
+            echo '- Central access screen: validated'
+            echo '- Parameter safe defaults: validated'
+            echo '- Server patch fixture: validated and idempotent'
+            echo '- Legacy access screen: preserved'
+            echo '- Automatic deployment: not added'
+          } >> "$GITHUB_STEP_SUMMARY"
