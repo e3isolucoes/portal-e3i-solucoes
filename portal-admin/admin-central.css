@@ -63,6 +63,7 @@ button, a, input, select { -webkit-tap-highlight-color: transparent; }
 .status-message { max-width: 1450px; min-height: 24px; margin: 0 auto 12px; color: var(--muted); font-size: .9rem; }
 .status-message.error { color: var(--danger); }
 .status-message.success { color: var(--success); }
+.status-message.warning { color: var(--warning); font-weight: 700; }
 .panel { max-width: 1450px; margin: 0 auto; }
 .panel-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; margin-bottom: 18px; }
 .panel-head h2 { margin: 5px 0 5px; font-family: Georgia, "Zilla Slab", serif; font-size: 1.7rem; color: var(--brand-navy-deep); }
