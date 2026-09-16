@@ -1,0 +1,16 @@
+// E3I_ADMIN_BRAND_ASSETS_PATCH_V1
+const e3iAdminBrandFs = require('fs');
+const E3I_ADMIN_BRAND_LOGO_FILE = process.env.E3I_ADMIN_BRAND_LOGO_FILE || '/app/dist/e3i-logo.svg';
+
+app.get('/e3i-logo.svg', (req, res) => {
+  try {
+    const logo = e3iAdminBrandFs.readFileSync(E3I_ADMIN_BRAND_LOGO_FILE, 'utf8');
+    res.set('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.status(200).send(logo);
+  } catch (_) {
+    console.error('[admin-brand] logo read failed');
+    return res.status(404).end();
+  }
+});
