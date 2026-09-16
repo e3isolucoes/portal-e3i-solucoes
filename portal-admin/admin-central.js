@@ -163,9 +163,14 @@ async function saveUser(event) {
   if (!id && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setStatus('Informe um e-mail válido.', 'error');
   els.saveUser.disabled = true;
   try {
-    if (id) await api(endpoint(`/users/${encodeURIComponent(id)}`), writeOptions('PATCH', { name, role }));
-    else await api(endpoint('/users'), writeOptions('POST', { name, email, role, sendInvite: els.sendInvite.checked }));
-    closeUserDialog(); await Promise.all([loadUsers(), loadAdminEvents()]); setStatus(id ? 'Usuário atualizado com sucesso.' : 'Usuário criado com primeiro acesso seguro.', 'success');
+    let payload = {};
+    if (id) payload = await api(endpoint(`/users/${encodeURIComponent(id)}`), writeOptions('PATCH', { name, role }));
+    else payload = await api(endpoint('/users'), writeOptions('POST', { name, email, role, sendInvite: els.sendInvite.checked }));
+    closeUserDialog(); await Promise.all([loadUsers(), loadAdminEvents()]);
+    if (id) setStatus('Usuário atualizado com sucesso.', 'success');
+    else if (payload.inviteDelivery === 'FAILED') setStatus('Usuário criado, mas o e-mail de primeiro acesso não pôde ser enviado. Use “Redefinir” para solicitar um novo código.', 'warning');
+    else if (payload.inviteDelivery === 'NOT_REQUESTED') setStatus('Usuário criado. O primeiro acesso ainda precisa ser solicitado.', 'success');
+    else setStatus('Usuário criado com primeiro acesso seguro.', 'success');
   } catch (error) { setStatus(error.message, 'error'); } finally { els.saveUser.disabled = false; }
 }
 
@@ -185,8 +190,12 @@ async function revokeSessions(user) {
 async function requireFirstLogin(user) {
   if (!(await confirmAction({ title: 'Exigir nova definição de senha?', message: `${user.name} terá as sessões revogadas e precisará concluir novamente o fluxo seguro por código de e-mail.`, danger: true }))) return;
   state.busyUserId = user.id; renderUsers();
-  try { await api(endpoint(`/users/${encodeURIComponent(user.id)}/require-first-login`), writeOptions('POST', { sendCode: true })); await Promise.all([loadUsers(), loadAdminEvents()]); setStatus('Novo primeiro acesso exigido. O envio do código foi solicitado.', 'success'); }
-  catch (error) { setStatus(error.message, 'error'); } finally { state.busyUserId = ''; renderUsers(); }
+  try {
+    const payload = await api(endpoint(`/users/${encodeURIComponent(user.id)}/require-first-login`), writeOptions('POST', { sendCode: true }));
+    await Promise.all([loadUsers(), loadAdminEvents()]);
+    if (payload.delivery === 'FAILED') setStatus('Novo primeiro acesso exigido, mas o código não pôde ser enviado. Tente novamente após verificar o serviço de e-mail.', 'warning');
+    else setStatus('Novo primeiro acesso exigido. O envio do código foi solicitado.', 'success');
+  } catch (error) { setStatus(error.message, 'error'); } finally { state.busyUserId = ''; renderUsers(); }
 }
 
 function renderTools() {
