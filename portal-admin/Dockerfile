@@ -44,11 +44,20 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq '/api/admin/organizations/' /app/dist/admin-ferramentas.js \
  && grep -Fq 'admin-ferramentas.js' /app/dist/admin-ferramentas.html \
  && grep -Fq '/api/client-tools' /app/dist/admin-central.js \
+ && grep -Fq '/users' /app/dist/admin-central.js \
+ && grep -Fq 'revoke-sessions' /app/dist/admin-central.js \
+ && grep -Fq 'require-first-login' /app/dist/admin-central.js \
+ && grep -Fq 'admin-events' /app/dist/admin-central.js \
  && grep -Fq 'central-settings' /app/dist/admin-central.js \
  && grep -Fq 'x-e3i-admin-request' /app/dist/admin-central.js \
  && grep -Fq 'admin-central.js' /app/dist/admin-central.html \
- && grep -Fq 'E3I_ADMIN_CENTRAL_PATCH_V1' /app/dist/server.cjs \
+ && grep -Fq 'E3I_ADMIN_CENTRAL_PATCH_V2' /app/dist/server.cjs \
+ && grep -Fq 'E3I_ADMIN_USER_STATUS_GUARD_V1' /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/central-settings' /app/dist/server.cjs \
+ && grep -Fq '/api/admin/organizations/:organizationId/users' /app/dist/server.cjs \
+ && grep -Fq '/api/admin/organizations/:organizationId/admin-events' /app/dist/server.cjs \
+ && grep -Fq 'SELF_LOCKOUT_BLOCKED' /app/dist/server.cjs \
+ && grep -Fq 'LAST_ADMIN_REQUIRED' /app/dist/server.cjs \
  && grep -Fq 'E3I_CLIENT_TOOL_AUTH_BRIDGE_V1' /app/dist/client-tool-auth.js \
  && grep -Fq '/api/client-tools' /app/dist/client-tool-auth.js \
  && grep -Fq "credentials = 'same-origin'" /app/dist/client-tool-auth.js \
@@ -62,10 +71,11 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq 'data-e3i-first-login-start' /app/dist/first-login.js \
  && grep -Fq '/first-login.js' /app/dist/index.html \
  && echo 'PORTAL_ADMIN_CENTRAL_VALIDATION_OK' \
+ && echo 'PORTAL_ADMIN_USER_LIFECYCLE_VALIDATION_OK' \
  && echo 'PORTAL_CLIENT_TOOL_AUTH_VALIDATION_OK' \
  && echo 'PORTAL_FIRST_LOGIN_TRANSPORT_VALIDATION_OK'
 
 CMD ["sh", "-c", "node /app/migrate-gra-users.cjs && exec node /app/dist/server.cjs"]
 
-LABEL e3i.portal.feature="tool-access-admin,central-admin-settings,first-login-password,first-login-transport,client-tool-auth-bridge" \
+LABEL e3i.portal.feature="tool-access-admin,central-admin-settings,admin-user-lifecycle,e3i-brand-theme,first-login-password,first-login-transport,client-tool-auth-bridge" \
       e3i.portal.base-digest="sha256:04d63f77dbd8fef806a9b19601909b10901f2e8f0a4558df22a93bdeed4b3fb1"
