@@ -1,6 +1,7 @@
-// E3I_ADMIN_CENTRAL_PATCH_V1
+// E3I_ADMIN_CENTRAL_PATCH_V2
 const e3iAdminCentralFs = require('fs');
 const e3iAdminCentralPath = require('path');
+const e3iAdminCentralCrypto = require('crypto');
 const E3I_ADMIN_CENTRAL_SETTINGS_FILE = process.env.E3I_ADMIN_SETTINGS_FILE || '/app/data/e3i_admin_settings.json';
 const E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE = process.env.E3I_PORTAL_DATA_FILE || '/app/data/bigquery_dataset.json';
 
@@ -14,363 +15,219 @@ const E3I_ADMIN_CENTRAL_DEFAULTS = Object.freeze({
     defaultRetentionClass: 'ANALYTICS_2Y',
     mappingPurposeId: 'process-mapping-v1',
   }),
-  governance: Object.freeze({
-    auditLevel: 'ENHANCED',
-    savingValidationRequired: true,
-  }),
+  governance: Object.freeze({ auditLevel: 'ENHANCED', savingValidationRequired: true }),
 });
+const E3I_ADMIN_CENTRAL_USER_ROLES = new Set(['OPERATOR', 'E3I_ADMIN']);
+const E3I_ADMIN_CENTRAL_USER_ACTIONS = new Set([
+  'ADMIN_USER_CREATED', 'ADMIN_USER_UPDATED', 'ADMIN_USER_SUSPENDED', 'ADMIN_USER_REACTIVATED',
+  'ADMIN_USER_SESSIONS_REVOKED', 'ADMIN_USER_FIRST_LOGIN_REQUIRED',
+]);
 
-function e3iAdminCentralClone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
+function e3iAdminCentralClone(value) { return JSON.parse(JSON.stringify(value)); }
 function e3iAdminCentralSafeText(value, maxLength, fallback = '') {
   const text = String(value ?? fallback).trim();
   if (!text || text.length > maxLength || /[\u0000-\u001f\u007f]/.test(text)) return null;
   return text;
 }
-
 function e3iAdminCentralReadJson(file, fallback) {
-  try {
-    const content = e3iAdminCentralFs.readFileSync(file, 'utf8');
-    return JSON.parse(content);
-  } catch (error) {
-    if (error && error.code === 'ENOENT') return e3iAdminCentralClone(fallback);
-    throw error;
-  }
+  try { return JSON.parse(e3iAdminCentralFs.readFileSync(file, 'utf8')); }
+  catch (error) { if (error && error.code === 'ENOENT') return e3iAdminCentralClone(fallback); throw error; }
 }
-
 function e3iAdminCentralWriteJsonAtomic(file, value) {
-  const dir = e3iAdminCentralPath.dirname(file);
-  e3iAdminCentralFs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const temp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  const backup = `${file}.bak`;
-  const serialized = `${JSON.stringify(value, null, 2)}\n`;
-  let fd;
+  const dir = e3iAdminCentralPath.dirname(file); e3iAdminCentralFs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const temp = `${file}.${process.pid}.${Date.now()}.tmp`; const backup = `${file}.bak`; const serialized = `${JSON.stringify(value, null, 2)}\n`; let fd;
   try {
-    fd = e3iAdminCentralFs.openSync(temp, 'w', 0o600);
-    e3iAdminCentralFs.writeFileSync(fd, serialized, 'utf8');
-    e3iAdminCentralFs.fsyncSync(fd);
-    e3iAdminCentralFs.closeSync(fd);
-    fd = undefined;
-    if (e3iAdminCentralFs.existsSync(file)) {
-      e3iAdminCentralFs.copyFileSync(file, backup);
-      try { e3iAdminCentralFs.chmodSync(backup, 0o600); } catch (_) {}
-    }
-    e3iAdminCentralFs.renameSync(temp, file);
-    try { e3iAdminCentralFs.chmodSync(file, 0o600); } catch (_) {}
-  } finally {
-    if (fd !== undefined) {
-      try { e3iAdminCentralFs.closeSync(fd); } catch (_) {}
-    }
-    if (e3iAdminCentralFs.existsSync(temp)) {
-      try { e3iAdminCentralFs.unlinkSync(temp); } catch (_) {}
-    }
-  }
+    fd = e3iAdminCentralFs.openSync(temp, 'w', 0o600); e3iAdminCentralFs.writeFileSync(fd, serialized, 'utf8'); e3iAdminCentralFs.fsyncSync(fd); e3iAdminCentralFs.closeSync(fd); fd = undefined;
+    if (e3iAdminCentralFs.existsSync(file)) { e3iAdminCentralFs.copyFileSync(file, backup); try { e3iAdminCentralFs.chmodSync(backup, 0o600); } catch (_) {} }
+    e3iAdminCentralFs.renameSync(temp, file); try { e3iAdminCentralFs.chmodSync(file, 0o600); } catch (_) {}
+  } finally { if (fd !== undefined) { try { e3iAdminCentralFs.closeSync(fd); } catch (_) {} } if (e3iAdminCentralFs.existsSync(temp)) { try { e3iAdminCentralFs.unlinkSync(temp); } catch (_) {} } }
 }
 
 function e3iAdminCentralPortalUsers(dataset) {
   if (!dataset || typeof dataset !== 'object') return [];
-  if (Array.isArray(dataset.users)) return dataset.users;
-  if (dataset.data && Array.isArray(dataset.data.users)) return dataset.data.users;
-  return [];
-}
-
-function e3iAdminCentralMemberships(dataset) {
-  if (!dataset || typeof dataset !== 'object') return [];
-  const candidates = [dataset.memberships, dataset.organizationMembers, dataset.tenantMemberships, dataset.data?.memberships];
+  const candidates = [dataset.users, dataset.data?.users, dataset.tables?.users?.data];
   return candidates.find(Array.isArray) || [];
 }
-
+function e3iAdminCentralMemberships(dataset) {
+  if (!dataset || typeof dataset !== 'object') return [];
+  const candidates = [dataset.memberships, dataset.organizationMembers, dataset.tenantMemberships, dataset.data?.memberships, dataset.tables?.organization_memberships?.data];
+  return candidates.find(Array.isArray) || [];
+}
 function e3iAdminCentralAuthCandidates(authResult) {
   const user = authResult?.user || authResult?.session?.user || authResult?.principal || {};
-  const ids = [
-    authResult?.userId,
-    authResult?.actorId,
-    user?.id,
-    user?.userId,
-    authResult?.session?.userId,
-  ].filter(Boolean).map(String);
-  const emails = [
-    authResult?.email,
-    user?.email,
-    authResult?.session?.email,
-  ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+  const ids = [authResult?.userId, authResult?.actorId, user?.id, user?.userId, authResult?.session?.userId].filter(Boolean).map(String);
+  const emails = [authResult?.email, user?.email, authResult?.session?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
   return { ids, emails, user };
 }
-
 function e3iAdminCentralFindUser(authResult, dataset) {
   const candidates = e3iAdminCentralAuthCandidates(authResult);
   return e3iAdminCentralPortalUsers(dataset).find((user) => {
-    const id = String(user?.id || user?.userId || '');
-    const email = String(user?.email || '').trim().toLowerCase();
+    const id = String(user?.id || user?.userId || ''); const email = String(user?.email || '').trim().toLowerCase();
     return (id && candidates.ids.includes(id)) || (email && candidates.emails.includes(email));
   }) || null;
 }
-
 function e3iAdminCentralRole(authResult, dataset) {
   const candidates = e3iAdminCentralAuthCandidates(authResult);
-  const directRoles = [
-    authResult?.role,
-    authResult?.portalRole,
-    authResult?.session?.role,
-    candidates.user?.role,
-    candidates.user?.portalRole,
-  ];
-  const directRoleArrays = [authResult?.roles, candidates.user?.roles, authResult?.session?.roles]
-    .filter(Array.isArray)
-    .flat();
-  if ([...directRoles, ...directRoleArrays].some((role) => String(role || '').toUpperCase() === 'E3I_ADMIN')) {
-    return 'E3I_ADMIN';
-  }
+  const directRoles = [authResult?.role, authResult?.systemRole, authResult?.portalRole, authResult?.session?.role, authResult?.session?.systemRole, candidates.user?.role, candidates.user?.systemRole, candidates.user?.portalRole];
+  const arrays = [authResult?.roles, candidates.user?.roles, authResult?.session?.roles].filter(Array.isArray).flat();
+  if ([...directRoles, ...arrays].some((role) => String(role || '').toUpperCase() === 'E3I_ADMIN')) return 'E3I_ADMIN';
   const storedUser = e3iAdminCentralFindUser(authResult, dataset);
-  const storedRoles = [storedUser?.role, storedUser?.portalRole, ...(Array.isArray(storedUser?.roles) ? storedUser.roles : [])];
-  return storedRoles.some((role) => String(role || '').toUpperCase() === 'E3I_ADMIN') ? 'E3I_ADMIN' : '';
+  return [storedUser?.role, storedUser?.systemRole, storedUser?.portalRole, ...(Array.isArray(storedUser?.roles) ? storedUser.roles : [])].some((role) => String(role || '').toUpperCase() === 'E3I_ADMIN') ? 'E3I_ADMIN' : '';
 }
-
 function e3iAdminCentralActiveOrganization(authResult, dataset) {
   const user = authResult?.user || authResult?.session?.user || authResult?.principal || {};
-  const direct = [
-    authResult?.organizationId,
-    authResult?.activeOrganizationId,
-    authResult?.tenantId,
-    authResult?.orgId,
-    authResult?.organization?.id,
-    authResult?.tenant?.id,
-    authResult?.session?.organizationId,
-    authResult?.session?.activeOrganizationId,
-    user?.organizationId,
-    user?.activeOrganizationId,
-  ].find((value) => value !== undefined && value !== null && String(value).trim());
+  const direct = [authResult?.organizationId, authResult?.activeOrganizationId, authResult?.tenantId, authResult?.orgId, authResult?.organization?.id, authResult?.tenant?.id, authResult?.session?.organizationId, authResult?.session?.activeOrganizationId, authResult?.session?.tenantId, user?.organizationId, user?.activeOrganizationId, user?.tenantId].find((value) => value !== undefined && value !== null && String(value).trim());
   if (direct) return String(direct).trim();
-
+  const storedUser = e3iAdminCentralFindUser(authResult, dataset);
+  const storedDirect = storedUser?.tenantId || storedUser?.organizationId;
+  if (storedDirect) return String(storedDirect).trim();
   const candidates = e3iAdminCentralAuthCandidates(authResult);
-  const memberships = e3iAdminCentralMemberships(dataset).filter((membership) => {
-    const memberId = String(membership?.userId || membership?.actorId || membership?.memberId || '');
-    const memberEmail = String(membership?.email || '').trim().toLowerCase();
-    const status = String(membership?.status || 'ACTIVE').toUpperCase();
-    const matches = (memberId && candidates.ids.includes(memberId)) || (memberEmail && candidates.emails.includes(memberEmail));
-    return matches && status !== 'INACTIVE' && status !== 'DISABLED';
-  });
-  const organizations = [...new Set(memberships.map((membership) => String(
-    membership?.organizationId || membership?.tenantId || membership?.orgId || '',
-  ).trim()).filter(Boolean))];
+  const organizations = [...new Set(e3iAdminCentralMemberships(dataset).filter((membership) => {
+    const memberId = String(membership?.userId || membership?.actorId || membership?.memberId || ''); const memberEmail = String(membership?.email || '').trim().toLowerCase(); const status = String(membership?.status || 'ACTIVE').toUpperCase();
+    return ((memberId && candidates.ids.includes(memberId)) || (memberEmail && candidates.emails.includes(memberEmail))) && !['INACTIVE', 'DISABLED'].includes(status);
+  }).map((membership) => String(membership?.organizationId || membership?.tenantId || membership?.orgId || '').trim()).filter(Boolean))];
   return organizations.length === 1 ? organizations[0] : '';
 }
-
 function e3iAdminCentralRequireAdmin(req, res) {
-  const authResult = validateSession(req, res);
-  if (!authResult) return null;
-  let dataset = null;
-  try {
-    dataset = e3iAdminCentralReadJson(E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE, {});
-  } catch (_) {
-    dataset = {};
-  }
-  if (e3iAdminCentralRole(authResult, dataset) !== 'E3I_ADMIN') {
-    res.status(403).json({ code: 'ADMIN_REQUIRED', error: 'Acesso administrativo necessário.' });
-    return null;
-  }
-  const activeOrganizationId = e3iAdminCentralActiveOrganization(authResult, dataset);
-  const requestedOrganizationId = String(req.params?.organizationId || '').trim();
-  if (!activeOrganizationId || !requestedOrganizationId || activeOrganizationId !== requestedOrganizationId) {
-    res.status(404).json({ code: 'NOT_FOUND', error: 'Recurso não encontrado.' });
-    return null;
-  }
-  const candidates = e3iAdminCentralAuthCandidates(authResult);
-  const storedUser = e3iAdminCentralFindUser(authResult, dataset);
-  const actorId = String(
-    authResult?.userId || authResult?.actorId || candidates.user?.id || storedUser?.id || storedUser?.userId || 'admin',
-  ).slice(0, 160);
+  const authResult = validateSession(req, res); if (!authResult) return null;
+  let dataset = {}; try { dataset = e3iAdminCentralReadJson(E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE, {}); } catch (_) {}
+  if (e3iAdminCentralRole(authResult, dataset) !== 'E3I_ADMIN') { res.status(403).json({ code: 'ADMIN_REQUIRED', error: 'Acesso administrativo necessário.' }); return null; }
+  const activeOrganizationId = e3iAdminCentralActiveOrganization(authResult, dataset); const requestedOrganizationId = String(req.params?.organizationId || '').trim();
+  if (!activeOrganizationId || !requestedOrganizationId || activeOrganizationId !== requestedOrganizationId) { res.status(404).json({ code: 'NOT_FOUND', error: 'Recurso não encontrado.' }); return null; }
+  const storedUser = e3iAdminCentralFindUser(authResult, dataset); const candidates = e3iAdminCentralAuthCandidates(authResult);
+  const actorId = String(storedUser?.id || storedUser?.userId || authResult?.userId || authResult?.actorId || candidates.user?.id || 'admin').slice(0, 160);
   return { authResult, organizationId: activeOrganizationId, actorId };
+}
+function e3iAdminCentralRequireWrite(req, res) {
+  if (String(req.get('x-e3i-admin-request') || '') !== '1') { res.status(403).json({ code: 'ADMIN_REQUEST_HEADER_REQUIRED', error: 'Requisição administrativa inválida.' }); return false; }
+  return true;
+}
+function e3iAdminCentralRejectSecurityContext(body) {
+  const forbidden = ['tenantId', 'organizationId', 'actorId', 'userId', 'id', 'password', 'passwordHash', 'roleId', 'roles', 'permissions', 'auth', 'context'];
+  return body && typeof body === 'object' && forbidden.some((key) => Object.prototype.hasOwnProperty.call(body, key));
 }
 
 function e3iAdminCentralValidateSettings(candidate) {
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-    throw Object.assign(new Error('Configuração inválida.'), { status: 400, code: 'INVALID_SETTINGS' });
-  }
-  const topKeys = Object.keys(candidate);
-  if (topKeys.some((key) => !['intelligence', 'governance'].includes(key))) {
-    throw Object.assign(new Error('Parâmetro não permitido.'), { status: 400, code: 'UNKNOWN_PARAMETER' });
-  }
-  const intelligence = candidate.intelligence;
-  const governance = candidate.governance;
-  if (!intelligence || typeof intelligence !== 'object' || Array.isArray(intelligence)) {
-    throw Object.assign(new Error('Bloco intelligence é obrigatório.'), { status: 400, code: 'INVALID_SETTINGS' });
-  }
-  if (!governance || typeof governance !== 'object' || Array.isArray(governance)) {
-    throw Object.assign(new Error('Bloco governance é obrigatório.'), { status: 400, code: 'INVALID_SETTINGS' });
-  }
-  const intelligenceKeys = [
-    'enabled',
-    'ingestionEnabled',
-    'agentMode',
-    'requireHumanApproval',
-    'allowSensitivePersonalData',
-    'defaultRetentionClass',
-    'mappingPurposeId',
-  ];
-  const governanceKeys = ['auditLevel', 'savingValidationRequired'];
-  if (Object.keys(intelligence).some((key) => !intelligenceKeys.includes(key)) ||
-      Object.keys(governance).some((key) => !governanceKeys.includes(key))) {
-    throw Object.assign(new Error('Parâmetro não permitido.'), { status: 400, code: 'UNKNOWN_PARAMETER' });
-  }
-  for (const field of ['enabled', 'ingestionEnabled', 'requireHumanApproval', 'allowSensitivePersonalData']) {
-    if (typeof intelligence[field] !== 'boolean') {
-      throw Object.assign(new Error(`Tipo inválido para ${field}.`), { status: 400, code: 'INVALID_PARAMETER_TYPE' });
-    }
-  }
-  if (!['DISABLED', 'READ_ONLY'].includes(intelligence.agentMode)) {
-    throw Object.assign(new Error('agentMode inválido.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
-  }
-  if (!['EPHEMERAL_30D', 'OPERATIONAL_1Y', 'ANALYTICS_2Y', 'AUDIT_POLICY', 'CUSTOM_POLICY'].includes(intelligence.defaultRetentionClass)) {
-    throw Object.assign(new Error('defaultRetentionClass inválido.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
-  }
-  const purpose = e3iAdminCentralSafeText(intelligence.mappingPurposeId, 120);
-  if (!purpose || purpose.includes('@') || /\d{3}\.\d{3}\.\d{3}/.test(purpose)) {
-    throw Object.assign(new Error('mappingPurposeId inválido.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
-  }
-  if (!['STANDARD', 'ENHANCED'].includes(governance.auditLevel)) {
-    throw Object.assign(new Error('auditLevel inválido.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
-  }
-  if (typeof governance.savingValidationRequired !== 'boolean') {
-    throw Object.assign(new Error('Tipo inválido para savingValidationRequired.'), { status: 400, code: 'INVALID_PARAMETER_TYPE' });
-  }
-  return {
-    intelligence: {
-      enabled: intelligence.enabled,
-      ingestionEnabled: intelligence.ingestionEnabled,
-      agentMode: intelligence.agentMode,
-      requireHumanApproval: intelligence.requireHumanApproval,
-      allowSensitivePersonalData: intelligence.allowSensitivePersonalData,
-      defaultRetentionClass: intelligence.defaultRetentionClass,
-      mappingPurposeId: purpose,
-    },
-    governance: {
-      auditLevel: governance.auditLevel,
-      savingValidationRequired: governance.savingValidationRequired,
-    },
-  };
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw Object.assign(new Error('Configuração inválida.'), { status: 400, code: 'INVALID_SETTINGS' });
+  if (Object.keys(candidate).some((key) => !['intelligence', 'governance'].includes(key))) throw Object.assign(new Error('Parâmetro não permitido.'), { status: 400, code: 'UNKNOWN_PARAMETER' });
+  const intelligence = candidate.intelligence; const governance = candidate.governance;
+  if (!intelligence || typeof intelligence !== 'object' || Array.isArray(intelligence) || !governance || typeof governance !== 'object' || Array.isArray(governance)) throw Object.assign(new Error('Blocos de configuração obrigatórios.'), { status: 400, code: 'INVALID_SETTINGS' });
+  const intelligenceKeys = ['enabled', 'ingestionEnabled', 'agentMode', 'requireHumanApproval', 'allowSensitivePersonalData', 'defaultRetentionClass', 'mappingPurposeId']; const governanceKeys = ['auditLevel', 'savingValidationRequired'];
+  if (Object.keys(intelligence).some((key) => !intelligenceKeys.includes(key)) || Object.keys(governance).some((key) => !governanceKeys.includes(key))) throw Object.assign(new Error('Parâmetro não permitido.'), { status: 400, code: 'UNKNOWN_PARAMETER' });
+  for (const field of ['enabled', 'ingestionEnabled', 'requireHumanApproval', 'allowSensitivePersonalData']) if (typeof intelligence[field] !== 'boolean') throw Object.assign(new Error(`Tipo inválido para ${field}.`), { status: 400, code: 'INVALID_PARAMETER_TYPE' });
+  if (!['DISABLED', 'READ_ONLY'].includes(intelligence.agentMode)) throw Object.assign(new Error('agentMode inválido.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
+  if (!['EPHEMERAL_30D', 'OPERATIONAL_1Y', 'ANALYTICS_2Y', 'AUDIT_POLICY', 'CUSTOM_POLICY'].includes(intelligence.defaultRetentionClass)) throw Object.assign(new Error('defaultRetentionClass inválido.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
+  const purpose = e3iAdminCentralSafeText(intelligence.mappingPurposeId, 120); if (!purpose || purpose.includes('@') || /\d{3}\.\d{3}\.\d{3}/.test(purpose)) throw Object.assign(new Error('mappingPurposeId inválido.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
+  if (!['STANDARD', 'ENHANCED'].includes(governance.auditLevel) || typeof governance.savingValidationRequired !== 'boolean') throw Object.assign(new Error('Governança inválida.'), { status: 400, code: 'INVALID_PARAMETER_VALUE' });
+  return { intelligence: { enabled: intelligence.enabled, ingestionEnabled: intelligence.ingestionEnabled, agentMode: intelligence.agentMode, requireHumanApproval: intelligence.requireHumanApproval, allowSensitivePersonalData: intelligence.allowSensitivePersonalData, defaultRetentionClass: intelligence.defaultRetentionClass, mappingPurposeId: purpose }, governance: { auditLevel: governance.auditLevel, savingValidationRequired: governance.savingValidationRequired } };
 }
+function e3iAdminCentralRoot() { const root = e3iAdminCentralReadJson(E3I_ADMIN_CENTRAL_SETTINGS_FILE, { schemaVersion: 1, organizations: {} }); return root && root.schemaVersion === 1 && root.organizations && typeof root.organizations === 'object' ? root : { schemaVersion: 1, organizations: {} }; }
+function e3iAdminCentralCurrent(root, organizationId) { const current = root.organizations[organizationId]; if (!current || typeof current !== 'object') return { version: 0, settings: e3iAdminCentralClone(E3I_ADMIN_CENTRAL_DEFAULTS), updatedAt: '', audit: [] }; return { version: Number.isInteger(current.version) && current.version >= 0 ? current.version : 0, settings: e3iAdminCentralValidateSettings(current.settings || e3iAdminCentralClone(E3I_ADMIN_CENTRAL_DEFAULTS)), updatedAt: String(current.updatedAt || ''), audit: Array.isArray(current.audit) ? current.audit.slice(-100) : [] }; }
+function e3iAdminCentralChangedKeys(previous, next) { const keys = []; for (const [group, fields] of Object.entries(next)) for (const [key, value] of Object.entries(fields)) if (previous?.[group]?.[key] !== value) keys.push(`${group}.${key}`); return keys; }
 
-function e3iAdminCentralRoot() {
-  const root = e3iAdminCentralReadJson(E3I_ADMIN_CENTRAL_SETTINGS_FILE, { schemaVersion: 1, organizations: {} });
-  if (!root || typeof root !== 'object' || root.schemaVersion !== 1 || !root.organizations || typeof root.organizations !== 'object') {
-    return { schemaVersion: 1, organizations: {} };
-  }
-  return root;
+function e3iAdminCentralLiveUsers() { return Array.isArray(users) ? users : []; }
+function e3iAdminCentralLiveSessions() { return Array.isArray(sessions) ? sessions : []; }
+function e3iAdminCentralLiveAudit() { return Array.isArray(auditLogs) ? auditLogs : []; }
+function e3iAdminCentralUserRole(user) { return String(user?.systemRole || user?.role || 'OPERATOR').toUpperCase() === 'E3I_ADMIN' ? 'E3I_ADMIN' : 'OPERATOR'; }
+function e3iAdminCentralUserStatus(user) { return String(user?.status || 'ACTIVE').toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 'DISABLED'; }
+function e3iAdminCentralUserBelongs(user, organizationId) { return [user?.tenantId, user?.organizationId, user?.activeOrganizationId].some((value) => String(value || '') === String(organizationId)); }
+function e3iAdminCentralFindLiveUser(organizationId, userId) { return e3iAdminCentralLiveUsers().find((user) => String(user?.id || user?.userId || '') === String(userId) && e3iAdminCentralUserBelongs(user, organizationId)) || null; }
+function e3iAdminCentralActiveAdminCount(organizationId) { return e3iAdminCentralLiveUsers().filter((user) => e3iAdminCentralUserBelongs(user, organizationId) && e3iAdminCentralUserStatus(user) === 'ACTIVE' && e3iAdminCentralUserRole(user) === 'E3I_ADMIN').length; }
+function e3iAdminCentralRevokeSessions(userId) { const now = new Date().toISOString(); let count = 0; for (const session of e3iAdminCentralLiveSessions()) { if (String(session?.userId || '') === String(userId) && !session.revokedAt) { session.revokedAt = now; count += 1; } } return count; }
+function e3iAdminCentralUserDto(user, principal) {
+  const id = String(user?.id || user?.userId || ''); const activeSessions = e3iAdminCentralLiveSessions().filter((session) => String(session?.userId || '') === id && !session.revokedAt).length;
+  return { id, name: String(user?.name || ''), email: String(user?.email || ''), role: e3iAdminCentralUserRole(user), status: e3iAdminCentralUserStatus(user), mustChangePassword: user?.mustChangePassword === true, activeSessions, createdAt: String(user?.createdAt || ''), updatedAt: String(user?.updatedAt || ''), isCurrentActor: id === String(principal.actorId) };
 }
-
-function e3iAdminCentralCurrent(root, organizationId) {
-  const current = root.organizations[organizationId];
-  if (!current || typeof current !== 'object') {
-    return {
-      version: 0,
-      settings: e3iAdminCentralClone(E3I_ADMIN_CENTRAL_DEFAULTS),
-      updatedAt: '',
-      audit: [],
-    };
-  }
-  return {
-    version: Number.isInteger(current.version) && current.version >= 0 ? current.version : 0,
-    settings: e3iAdminCentralValidateSettings(current.settings || e3iAdminCentralClone(E3I_ADMIN_CENTRAL_DEFAULTS)),
-    updatedAt: String(current.updatedAt || ''),
-    audit: Array.isArray(current.audit) ? current.audit.slice(-100) : [],
-  };
+function e3iAdminCentralAudit(principal, action, targetUserId, detail = '') {
+  e3iAdminCentralLiveAudit().unshift({ id: `log-${Date.now()}-${e3iAdminCentralCrypto.randomBytes(3).toString('hex')}`, timestamp: new Date().toISOString(), actorId: principal.actorId, userId: targetUserId, action, module: 'Administração', status: 'SUCCESS', details: String(detail || '').slice(0, 180) });
 }
-
-function e3iAdminCentralChangedKeys(previous, next) {
-  const keys = [];
-  for (const [group, fields] of Object.entries(next)) {
-    for (const [key, value] of Object.entries(fields)) {
-      if (previous?.[group]?.[key] !== value) keys.push(`${group}.${key}`);
-    }
-  }
-  return keys;
+function e3iAdminCentralValidateRole(value) { const role = String(value || '').toUpperCase(); if (!E3I_ADMIN_CENTRAL_USER_ROLES.has(role)) throw Object.assign(new Error('Papel de usuário inválido.'), { status: 400, code: 'INVALID_USER_ROLE' }); return role; }
+function e3iAdminCentralValidateName(value) { const name = e3iAdminCentralSafeText(value, 160); if (!name || name.length < 2) throw Object.assign(new Error('Nome de usuário inválido.'), { status: 400, code: 'INVALID_USER_NAME' }); return name; }
+function e3iAdminCentralValidateEmail(value) { const email = String(value || '').trim().toLowerCase(); if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('E-mail inválido.'), { status: 400, code: 'INVALID_USER_EMAIL' }); return email; }
+function e3iAdminCentralProtectAdmin(principal, target, nextRole, nextStatus) {
+  const targetId = String(target?.id || target?.userId || '');
+  if (targetId === String(principal.actorId) && (nextRole === 'OPERATOR' || nextStatus === 'DISABLED')) throw Object.assign(new Error('A própria conta administrativa não pode remover seu acesso nesta sessão.'), { status: 409, code: 'SELF_LOCKOUT_BLOCKED' });
+  if (e3iAdminCentralUserRole(target) === 'E3I_ADMIN' && e3iAdminCentralUserStatus(target) === 'ACTIVE' && (nextRole === 'OPERATOR' || nextStatus === 'DISABLED') && e3iAdminCentralActiveAdminCount(principal.organizationId) <= 1) throw Object.assign(new Error('A organização precisa manter ao menos um administrador ativo.'), { status: 409, code: 'LAST_ADMIN_REQUIRED' });
 }
+function e3iAdminCentralUserError(res, error, fallback) { const status = Number(error?.status) || 500; if (status >= 500) console.error('[admin-central] user administration failed'); return res.status(status).json({ code: status < 500 ? String(error?.code || 'INVALID_REQUEST') : 'INTERNAL_ERROR', error: status < 500 ? String(error?.message || fallback) : fallback }); }
 
 app.get('/api/admin/organizations/:organizationId/central-settings', (req, res) => {
-  try {
-    const principal = e3iAdminCentralRequireAdmin(req, res);
-    if (!principal) return;
-    const root = e3iAdminCentralRoot();
-    const current = e3iAdminCentralCurrent(root, principal.organizationId);
-    res.set('Cache-Control', 'no-store');
-    return res.json({
-      organizationId: principal.organizationId,
-      version: current.version,
-      settings: current.settings,
-      updatedAt: current.updatedAt,
-      audit: current.audit,
-    });
-  } catch (_) {
-    console.error('[admin-central] settings read failed');
-    return res.status(500).json({ code: 'INTERNAL_ERROR', error: 'Não foi possível carregar os parâmetros.' });
-  }
+  try { const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal) return; const current = e3iAdminCentralCurrent(e3iAdminCentralRoot(), principal.organizationId); res.set('Cache-Control', 'no-store'); return res.json({ organizationId: principal.organizationId, version: current.version, settings: current.settings, updatedAt: current.updatedAt, audit: current.audit }); }
+  catch (_) { console.error('[admin-central] settings read failed'); return res.status(500).json({ code: 'INTERNAL_ERROR', error: 'Não foi possível carregar os parâmetros.' }); }
 });
-
 app.put('/api/admin/organizations/:organizationId/central-settings', (req, res) => {
   try {
-    const principal = e3iAdminCentralRequireAdmin(req, res);
-    if (!principal) return;
-    if (String(req.get('x-e3i-admin-request') || '') !== '1') {
-      return res.status(403).json({ code: 'ADMIN_REQUEST_HEADER_REQUIRED', error: 'Requisição administrativa inválida.' });
-    }
-    const body = req.body;
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return res.status(400).json({ code: 'INVALID_BODY', error: 'Corpo da requisição inválido.' });
-    }
-    const forbiddenSecurityFields = ['tenantId', 'organizationId', 'actorId', 'userId', 'role', 'roles', 'permissions', 'auth', 'context'];
-    if (forbiddenSecurityFields.some((key) => Object.prototype.hasOwnProperty.call(body, key))) {
-      return res.status(400).json({ code: 'SECURITY_CONTEXT_FORBIDDEN', error: 'Contexto de segurança não pode ser definido pelo cliente.' });
-    }
-    if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 0) {
-      return res.status(400).json({ code: 'INVALID_VERSION', error: 'Versão esperada inválida.' });
-    }
-    const nextSettings = e3iAdminCentralValidateSettings(body.settings);
-    const root = e3iAdminCentralRoot();
-    const current = e3iAdminCentralCurrent(root, principal.organizationId);
-    if (body.expectedVersion !== current.version) {
-      return res.status(409).json({
-        code: 'VERSION_CONFLICT',
-        error: 'A configuração foi alterada por outra sessão.',
-        currentVersion: current.version,
-      });
-    }
-    const changedKeys = e3iAdminCentralChangedKeys(current.settings, nextSettings);
-    const nextVersion = current.version + 1;
-    const updatedAt = new Date().toISOString();
-    const audit = [
-      ...current.audit,
-      {
-        action: 'CENTRAL_SETTINGS_UPDATED',
-        version: nextVersion,
-        actorId: principal.actorId,
-        changedKeys,
-        occurredAt: updatedAt,
-      },
-    ].slice(-100);
-    root.organizations[principal.organizationId] = {
-      version: nextVersion,
-      settings: nextSettings,
-      updatedAt,
-      updatedByActorId: principal.actorId,
-      audit,
-    };
-    e3iAdminCentralWriteJsonAtomic(E3I_ADMIN_CENTRAL_SETTINGS_FILE, root);
-    res.set('Cache-Control', 'no-store');
-    return res.json({
-      organizationId: principal.organizationId,
-      version: nextVersion,
-      settings: nextSettings,
-      updatedAt,
-      audit,
-    });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    const code = status < 500 ? String(error?.code || 'INVALID_SETTINGS') : 'INTERNAL_ERROR';
-    const message = status < 500 ? String(error?.message || 'Configuração inválida.') : 'Não foi possível salvar os parâmetros.';
-    if (status >= 500) console.error('[admin-central] settings write failed');
-    return res.status(status).json({ code, error: message });
-  }
+    const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal || !e3iAdminCentralRequireWrite(req, res)) return;
+    const body = req.body; if (!body || typeof body !== 'object' || Array.isArray(body)) return res.status(400).json({ code: 'INVALID_BODY', error: 'Corpo da requisição inválido.' });
+    if (e3iAdminCentralRejectSecurityContext(body)) return res.status(400).json({ code: 'SECURITY_CONTEXT_FORBIDDEN', error: 'Contexto de segurança não pode ser definido pelo cliente.' });
+    if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 0) return res.status(400).json({ code: 'INVALID_VERSION', error: 'Versão esperada inválida.' });
+    const nextSettings = e3iAdminCentralValidateSettings(body.settings); const root = e3iAdminCentralRoot(); const current = e3iAdminCentralCurrent(root, principal.organizationId);
+    if (body.expectedVersion !== current.version) return res.status(409).json({ code: 'VERSION_CONFLICT', error: 'A configuração foi alterada por outra sessão.', currentVersion: current.version });
+    const changedKeys = e3iAdminCentralChangedKeys(current.settings, nextSettings); const nextVersion = current.version + 1; const updatedAt = new Date().toISOString(); const audit = [...current.audit, { action: 'CENTRAL_SETTINGS_UPDATED', version: nextVersion, actorId: principal.actorId, changedKeys, occurredAt: updatedAt }].slice(-100);
+    root.organizations[principal.organizationId] = { version: nextVersion, settings: nextSettings, updatedAt, updatedByActorId: principal.actorId, audit }; e3iAdminCentralWriteJsonAtomic(E3I_ADMIN_CENTRAL_SETTINGS_FILE, root); res.set('Cache-Control', 'no-store'); return res.json({ organizationId: principal.organizationId, version: nextVersion, settings: nextSettings, updatedAt, audit });
+  } catch (error) { const status = Number(error?.status) || 500; if (status >= 500) console.error('[admin-central] settings write failed'); return res.status(status).json({ code: status < 500 ? String(error?.code || 'INVALID_SETTINGS') : 'INTERNAL_ERROR', error: status < 500 ? String(error?.message || 'Configuração inválida.') : 'Não foi possível salvar os parâmetros.' }); }
+});
+
+app.get('/api/admin/organizations/:organizationId/users', (req, res) => {
+  try { const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal) return; const list = e3iAdminCentralLiveUsers().filter((user) => e3iAdminCentralUserBelongs(user, principal.organizationId)).map((user) => e3iAdminCentralUserDto(user, principal)).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')); res.set('Cache-Control', 'no-store'); return res.json({ organizationId: principal.organizationId, users: list }); }
+  catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível carregar os usuários.'); }
+});
+app.post('/api/admin/organizations/:organizationId/users', async (req, res) => {
+  try {
+    const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal || !e3iAdminCentralRequireWrite(req, res)) return; const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body) || e3iAdminCentralRejectSecurityContext(body)) return res.status(400).json({ code: 'INVALID_BODY', error: 'Dados do usuário inválidos.' });
+    if (Object.keys(body).some((key) => !['name', 'email', 'role', 'sendInvite'].includes(key))) return res.status(400).json({ code: 'UNKNOWN_FIELD', error: 'Campo de usuário não permitido.' });
+    const name = e3iAdminCentralValidateName(body.name); const email = e3iAdminCentralValidateEmail(body.email); const role = e3iAdminCentralValidateRole(body.role || 'OPERATOR');
+    if (e3iAdminCentralLiveUsers().some((user) => String(user?.email || '').trim().toLowerCase() === email)) return res.status(409).json({ code: 'EMAIL_ALREADY_REGISTERED', error: 'Este e-mail já está cadastrado no Portal.' });
+    const now = new Date().toISOString(); const user = { id: `usr-${e3iAdminCentralCrypto.randomUUID()}`, name, email, passwordHash: '', status: 'ACTIVE', role, systemRole: role, tenantId: principal.organizationId, createdAt: now, updatedAt: now, mustChangePassword: true, passwordOnboardingVersion: 0 };
+    e3iAdminCentralLiveUsers().push(user); e3iAdminCentralAudit(principal, 'ADMIN_USER_CREATED', user.id, `role:${role}`); saveStorage();
+    let inviteDelivery = 'NOT_REQUESTED';
+    if (body.sendInvite === true) { try { await e3iIssuePasswordSetupCode(user); inviteDelivery = 'SENT'; } catch (_) { inviteDelivery = 'FAILED'; console.error('[admin-central] first-access delivery failed'); } }
+    return res.status(201).json({ user: e3iAdminCentralUserDto(user, principal), inviteDelivery });
+  } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível criar o usuário.'); }
+});
+app.patch('/api/admin/organizations/:organizationId/users/:userId', (req, res) => {
+  try {
+    const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal || !e3iAdminCentralRequireWrite(req, res)) return; const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body) || e3iAdminCentralRejectSecurityContext(body) || Object.keys(body).some((key) => !['name', 'role'].includes(key))) return res.status(400).json({ code: 'INVALID_BODY', error: 'Alteração de usuário inválida.' });
+    const target = e3iAdminCentralFindLiveUser(principal.organizationId, req.params.userId); if (!target) return res.status(404).json({ code: 'NOT_FOUND', error: 'Recurso não encontrado.' });
+    const nextName = body.name === undefined ? String(target.name || '') : e3iAdminCentralValidateName(body.name); const nextRole = body.role === undefined ? e3iAdminCentralUserRole(target) : e3iAdminCentralValidateRole(body.role);
+    e3iAdminCentralProtectAdmin(principal, target, nextRole, e3iAdminCentralUserStatus(target)); const roleChanged = nextRole !== e3iAdminCentralUserRole(target);
+    target.name = nextName; target.role = nextRole; target.systemRole = nextRole; target.updatedAt = new Date().toISOString(); if (roleChanged) e3iAdminCentralRevokeSessions(target.id || target.userId);
+    e3iAdminCentralAudit(principal, 'ADMIN_USER_UPDATED', target.id || target.userId, roleChanged ? 'role_changed' : 'profile_changed'); saveStorage(); return res.json({ user: e3iAdminCentralUserDto(target, principal) });
+  } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível atualizar o usuário.'); }
+});
+app.post('/api/admin/organizations/:organizationId/users/:userId/status', (req, res) => {
+  try {
+    const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal || !e3iAdminCentralRequireWrite(req, res)) return; const status = String(req.body?.status || '').toUpperCase(); if (!['ACTIVE', 'DISABLED'].includes(status)) return res.status(400).json({ code: 'INVALID_STATUS', error: 'Status inválido.' });
+    const target = e3iAdminCentralFindLiveUser(principal.organizationId, req.params.userId); if (!target) return res.status(404).json({ code: 'NOT_FOUND', error: 'Recurso não encontrado.' });
+    e3iAdminCentralProtectAdmin(principal, target, e3iAdminCentralUserRole(target), status); target.status = status; target.updatedAt = new Date().toISOString();
+    if (status === 'DISABLED') { e3iAdminCentralRevokeSessions(target.id || target.userId); if (typeof e3iClearPasswordSetup === 'function') e3iClearPasswordSetup(target); }
+    e3iAdminCentralAudit(principal, status === 'ACTIVE' ? 'ADMIN_USER_REACTIVATED' : 'ADMIN_USER_SUSPENDED', target.id || target.userId, `status:${status}`); saveStorage(); return res.json({ user: e3iAdminCentralUserDto(target, principal) });
+  } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível alterar o status do usuário.'); }
+});
+app.post('/api/admin/organizations/:organizationId/users/:userId/revoke-sessions', (req, res) => {
+  try {
+    const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal || !e3iAdminCentralRequireWrite(req, res)) return; const target = e3iAdminCentralFindLiveUser(principal.organizationId, req.params.userId); if (!target) return res.status(404).json({ code: 'NOT_FOUND', error: 'Recurso não encontrado.' });
+    if (String(target.id || target.userId) === String(principal.actorId)) return res.status(409).json({ code: 'SELF_SESSION_REVOKE_BLOCKED', error: 'Use o logout para encerrar a própria sessão administrativa.' });
+    const revokedSessions = e3iAdminCentralRevokeSessions(target.id || target.userId); e3iAdminCentralAudit(principal, 'ADMIN_USER_SESSIONS_REVOKED', target.id || target.userId, `sessions:${revokedSessions}`); saveStorage(); return res.json({ success: true, revokedSessions });
+  } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível revogar as sessões.'); }
+});
+app.post('/api/admin/organizations/:organizationId/users/:userId/require-first-login', async (req, res) => {
+  try {
+    const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal || !e3iAdminCentralRequireWrite(req, res)) return; const target = e3iAdminCentralFindLiveUser(principal.organizationId, req.params.userId); if (!target) return res.status(404).json({ code: 'NOT_FOUND', error: 'Recurso não encontrado.' });
+    if (String(target.id || target.userId) === String(principal.actorId)) return res.status(409).json({ code: 'SELF_PASSWORD_RESET_BLOCKED', error: 'A própria conta administrativa não pode ser redefinida por esta ação.' });
+    if (e3iAdminCentralUserStatus(target) !== 'ACTIVE') return res.status(409).json({ code: 'USER_DISABLED', error: 'Reative o usuário antes de exigir novo primeiro acesso.' });
+    target.mustChangePassword = true; target.passwordOnboardingVersion = 0; target.updatedAt = new Date().toISOString(); if (typeof e3iClearPasswordSetup === 'function') e3iClearPasswordSetup(target); e3iAdminCentralRevokeSessions(target.id || target.userId); e3iAdminCentralAudit(principal, 'ADMIN_USER_FIRST_LOGIN_REQUIRED', target.id || target.userId, 'secure_first_login'); saveStorage();
+    let delivery = 'NOT_REQUESTED'; if (req.body?.sendCode === true) { try { await e3iIssuePasswordSetupCode(target); delivery = 'SENT'; } catch (_) { delivery = 'FAILED'; console.error('[admin-central] password-reset delivery failed'); } }
+    return res.json({ success: true, delivery, user: e3iAdminCentralUserDto(target, principal) });
+  } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível exigir novo primeiro acesso.'); }
+});
+app.get('/api/admin/organizations/:organizationId/admin-events', (req, res) => {
+  try {
+    const principal = e3iAdminCentralRequireAdmin(req, res); if (!principal) return; const usersById = new Map(e3iAdminCentralLiveUsers().filter((user) => e3iAdminCentralUserBelongs(user, principal.organizationId)).map((user) => [String(user.id || user.userId || ''), true]));
+    const labels = { ADMIN_USER_CREATED: 'Usuário criado', ADMIN_USER_UPDATED: 'Usuário atualizado', ADMIN_USER_SUSPENDED: 'Usuário suspenso', ADMIN_USER_REACTIVATED: 'Usuário reativado', ADMIN_USER_SESSIONS_REVOKED: 'Sessões revogadas', ADMIN_USER_FIRST_LOGIN_REQUIRED: 'Novo primeiro acesso exigido' };
+    const events = e3iAdminCentralLiveAudit().filter((event) => E3I_ADMIN_CENTRAL_USER_ACTIONS.has(String(event?.action || '')) && usersById.has(String(event?.userId || ''))).slice(0, 100).map((event) => ({ action: String(event.action), label: labels[event.action] || 'Evento administrativo', targetUserId: String(event.userId || ''), actorId: String(event.actorId || 'admin'), detail: String(event.details || 'metadados administrativos').slice(0, 180), occurredAt: String(event.timestamp || event.occurredAt || '') }));
+    res.set('Cache-Control', 'no-store'); return res.json({ organizationId: principal.organizationId, events });
+  } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível carregar a auditoria.'); }
 });

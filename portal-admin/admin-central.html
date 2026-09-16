@@ -4,177 +4,210 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>E3I Soluções — Administração central</title>
+  <meta name="theme-color" content="#162e50" />
+  <title>E3I Soluções — Administração</title>
   <link rel="stylesheet" href="/admin-central.css" />
 </head>
 <body>
-  <main class="page-shell">
-    <header class="topbar">
+  <div class="admin-shell">
+    <aside class="sidebar" aria-label="Administração E3I">
       <a class="brand" href="/" aria-label="Voltar ao Portal E3I">
-        <span class="brand-mark" aria-hidden="true">E³I</span>
-        <span><strong>E3I Soluções</strong><small>Administração central</small></span>
+        <span class="brand-symbol" aria-hidden="true"><span>E</span><b>3</b><span>I</span></span>
+        <span class="brand-copy"><strong>E3I</strong><small>SOLUÇÕES</small></span>
       </a>
-      <div class="topbar-actions">
-        <a class="legacy-link" href="/admin-ferramentas.html">Tela clássica de acessos</a>
-        <a class="back-link" href="/">← Voltar ao portal</a>
-      </div>
-    </header>
 
-    <section class="hero" aria-labelledby="page-title">
-      <div>
-        <span class="eyebrow">GOVERNANÇA CENTRALIZADA</span>
-        <h1 id="page-title">Acessos e parâmetros</h1>
-        <p>Administre concessões de ferramentas e os parâmetros governados do E3I Intelligence sem alterar o funcionamento das ferramentas operacionais atuais.</p>
-      </div>
-      <div class="organization-card" aria-live="polite">
-        <span>Organização ativa</span>
+      <div class="org-context" aria-live="polite">
+        <span>ORGANIZAÇÃO ATIVA</span>
         <strong id="organizationId">Carregando…</strong>
         <small id="settingsVersion">Configuração v—</small>
       </div>
-    </section>
 
-    <section class="metrics" aria-label="Resumo da administração">
-      <article><span>Ferramentas</span><strong id="metricTotal">—</strong><small>catálogo atual</small></article>
-      <article><span>Acessos liberados</span><strong id="metricGranted">—</strong><small>organização ativa</small></article>
-      <article><span>Intelligence</span><strong id="metricIntelligence">—</strong><small id="metricIntelligenceHint">configuração central</small></article>
-      <article><span>Última alteração</span><strong id="metricUpdated">—</strong><small>parametrização</small></article>
-    </section>
+      <nav class="side-nav" aria-label="Áreas de administração">
+        <button class="nav-item is-active" type="button" data-tab="overview" aria-controls="panel-overview" aria-selected="true">
+          <span class="nav-icon" aria-hidden="true">▦</span><span>Visão geral</span>
+        </button>
+        <button class="nav-item" type="button" data-tab="users" aria-controls="panel-users" aria-selected="false">
+          <span class="nav-icon" aria-hidden="true">◎</span><span>Usuários</span>
+        </button>
+        <button class="nav-item" type="button" data-tab="access" aria-controls="panel-access" aria-selected="false">
+          <span class="nav-icon" aria-hidden="true">◇</span><span>Acessos</span>
+        </button>
+        <button class="nav-item" type="button" data-tab="parameters" aria-controls="panel-parameters" aria-selected="false">
+          <span class="nav-icon" aria-hidden="true">⌘</span><span>Parâmetros</span>
+        </button>
+        <button class="nav-item" type="button" data-tab="security" aria-controls="panel-security" aria-selected="false">
+          <span class="nav-icon" aria-hidden="true">⬡</span><span>Segurança</span>
+        </button>
+        <button class="nav-item" type="button" data-tab="audit" aria-controls="panel-audit" aria-selected="false">
+          <span class="nav-icon" aria-hidden="true">≡</span><span>Auditoria</span>
+        </button>
+      </nav>
 
-    <nav class="tabs" aria-label="Áreas de administração">
-      <button class="tab is-active" type="button" data-tab="access" aria-controls="panel-access" aria-selected="true">Acessos</button>
-      <button class="tab" type="button" data-tab="parameters" aria-controls="panel-parameters" aria-selected="false">Parâmetros</button>
-      <button class="tab" type="button" data-tab="governance" aria-controls="panel-governance" aria-selected="false">Governança</button>
-    </nav>
+      <div class="sidebar-footer">
+        <span class="secure-dot" aria-hidden="true"></span>
+        <span>Console administrativo protegido</span>
+        <a href="/admin-ferramentas.html">Acessos — tela clássica</a>
+      </div>
+    </aside>
 
-    <div id="globalStatus" class="status-message" role="status" aria-live="polite"></div>
-
-    <section id="panel-access" class="panel tab-panel" data-panel="access" aria-labelledby="access-heading">
-      <div class="panel-head">
+    <main class="workspace">
+      <header class="workspace-header">
         <div>
-          <span class="eyebrow">CONTROLE DE ACESSO</span>
-          <h2 id="access-heading">Ferramentas da organização</h2>
-          <p>As concessões continuam usando os contratos existentes do Portal. O servidor permanece como fonte de verdade.</p>
+          <span class="eyebrow">E3I ADMINISTRATION</span>
+          <h1 id="pageTitle">Visão geral</h1>
+          <p id="pageSubtitle">Governança central de identidade, acessos, segurança e parâmetros.</p>
         </div>
-        <label class="search-field">
-          <span class="sr-only">Buscar ferramenta</span>
-          <input id="searchInput" type="search" placeholder="Buscar ferramenta…" autocomplete="off" />
-        </label>
-      </div>
-      <div id="toolsGrid" class="tools-grid" aria-live="polite" aria-busy="true"></div>
-    </section>
-
-    <section id="panel-parameters" class="panel tab-panel" data-panel="parameters" aria-labelledby="parameters-heading" hidden>
-      <div class="panel-head">
-        <div>
-          <span class="eyebrow">PARAMETRIZAÇÃO</span>
-          <h2 id="parameters-heading">E3I Intelligence</h2>
-          <p>Estes valores formam o registro central da organização. Eles não modificam Portal, Painel de Obrigações ou outras ferramentas atuais até que uma integração explícita os consuma.</p>
+        <div class="header-actions">
+          <span class="admin-badge">E3I ADMIN</span>
+          <a class="btn btn-secondary" href="/">Minhas Ferramentas</a>
         </div>
-        <div class="panel-actions">
-          <button id="reloadSettings" type="button" class="btn btn-secondary">Recarregar</button>
-          <button id="saveSettings" type="button" class="btn btn-primary">Salvar parâmetros</button>
+      </header>
+
+      <div id="globalStatus" class="status-message" role="status" aria-live="polite"></div>
+
+      <section id="panel-overview" class="panel tab-panel" data-panel="overview">
+        <div class="metric-grid" aria-label="Resumo da administração">
+          <article class="metric-card"><span>Usuários ativos</span><strong id="metricUsers">—</strong><small id="metricUsersHint">organização ativa</small></article>
+          <article class="metric-card"><span>Administradores</span><strong id="metricAdmins">—</strong><small>privilégio E3I_ADMIN</small></article>
+          <article class="metric-card"><span>Acessos liberados</span><strong id="metricGranted">—</strong><small id="metricToolsHint">— ferramentas</small></article>
+          <article class="metric-card"><span>Intelligence</span><strong id="metricIntelligence">—</strong><small id="metricIntelligenceHint">configuração central</small></article>
         </div>
-      </div>
 
-      <div class="notice safe-defaults">
-        <strong>Guardrail:</strong> Intelligence e ingestão permanecem desligados por padrão; agentes não podem operar em modo de escrita nesta tela.
-      </div>
-
-      <form id="settingsForm" class="settings-layout" autocomplete="off" novalidate>
-        <fieldset class="settings-card">
-          <legend>Ativação e agentes</legend>
-          <label class="switch-row">
-            <span><strong>Habilitar E3I Intelligence</strong><small>Libera o consumo futuro desta configuração pela camada de Intelligence.</small></span>
-            <input id="intelligenceEnabled" type="checkbox" />
-          </label>
-          <label class="switch-row">
-            <span><strong>Habilitar ingestão</strong><small>Autoriza futura ingestão de dados das ferramentas E3I. Não cria integração automaticamente.</small></span>
-            <input id="ingestionEnabled" type="checkbox" />
-          </label>
-          <label class="field-row">
-            <span><strong>Modo dos agentes</strong><small>Somente desabilitado ou leitura nesta fase.</small></span>
-            <select id="agentMode">
-              <option value="DISABLED">Desabilitados</option>
-              <option value="READ_ONLY">Somente leitura</option>
-            </select>
-          </label>
-          <label class="switch-row">
-            <span><strong>Aprovação humana obrigatória</strong><small>Mantém decisões e ações relevantes sob confirmação humana.</small></span>
-            <input id="requireHumanApproval" type="checkbox" />
-          </label>
-          <label class="switch-row danger-row">
-            <span><strong>Permitir dados pessoais sensíveis</strong><small>Deve permanecer desligado salvo governança específica e finalidade aprovada.</small></span>
-            <input id="allowSensitivePersonalData" type="checkbox" />
-          </label>
-        </fieldset>
-
-        <fieldset class="settings-card">
-          <legend>LGPD e retenção</legend>
-          <label class="field-stack">
-            <span>Retenção padrão</span>
-            <select id="defaultRetentionClass">
-              <option value="EPHEMERAL_30D">Efêmera — 30 dias</option>
-              <option value="OPERATIONAL_1Y">Operacional — 1 ano</option>
-              <option value="ANALYTICS_2Y">Analytics — 2 anos</option>
-              <option value="AUDIT_POLICY">Política de auditoria</option>
-              <option value="CUSTOM_POLICY">Política customizada</option>
-            </select>
-          </label>
-          <label class="field-stack">
-            <span>Finalidade padrão de mapeamento</span>
-            <input id="mappingPurposeId" type="text" maxlength="120" placeholder="process-mapping-v1" spellcheck="false" />
-            <small>Identificador de finalidade governada; não informe nome, e-mail, CPF ou outro dado pessoal.</small>
-          </label>
-          <label class="field-row">
-            <span><strong>Nível de auditoria</strong><small>Define o nível de metadados de auditoria esperados.</small></span>
-            <select id="auditLevel">
-              <option value="STANDARD">Padrão</option>
-              <option value="ENHANCED">Reforçado</option>
-            </select>
-          </label>
-          <label class="switch-row">
-            <span><strong>Validação humana de saving</strong><small>Saving só pode ser considerado validado após confirmação humana.</small></span>
-            <input id="savingValidationRequired" type="checkbox" />
-          </label>
-        </fieldset>
-      </form>
-    </section>
-
-    <section id="panel-governance" class="panel tab-panel" data-panel="governance" aria-labelledby="governance-heading" hidden>
-      <div class="panel-head">
-        <div>
-          <span class="eyebrow">SEGURANÇA E LGPD</span>
-          <h2 id="governance-heading">Guardrails e auditoria</h2>
-          <p>Resumo dos controles que protegem a parametrização e a segregação da organização ativa.</p>
+        <div class="overview-grid">
+          <article class="overview-card featured">
+            <span class="eyebrow">IDENTIDADE E ACESSO</span>
+            <h2>Administração de usuários</h2>
+            <p>Crie contas, altere papéis, suspenda acessos, revogue sessões e exija novo primeiro acesso sem compartilhar senhas.</p>
+            <button class="btn btn-primary" type="button" data-open-tab="users">Gerenciar usuários</button>
+          </article>
+          <article class="overview-card">
+            <span class="eyebrow">ZERO TRUST OPERACIONAL</span>
+            <h2>Segurança por padrão</h2>
+            <p>Tenant validado no servidor, ações administrativas auditáveis, proteção contra auto-lockout e sem hard delete de identidade.</p>
+            <button class="btn btn-secondary" type="button" data-open-tab="security">Ver controles</button>
+          </article>
+          <article class="overview-card">
+            <span class="eyebrow">E3I INTELLIGENCE</span>
+            <h2>Parametrização governada</h2>
+            <p>Intelligence, ingestão e agentes permanecem sob feature flags e aprovação humana.</p>
+            <button class="btn btn-secondary" type="button" data-open-tab="parameters">Abrir parâmetros</button>
+          </article>
+          <article class="overview-card">
+            <span class="eyebrow">RASTREABILIDADE</span>
+            <h2>Trilha administrativa</h2>
+            <p>Alterações de identidade e configuração ficam registradas com ator, ação e horário, sem armazenar senha ou token.</p>
+            <button class="btn btn-secondary" type="button" data-open-tab="audit">Ver auditoria</button>
+          </article>
         </div>
-      </div>
+      </section>
 
-      <div class="governance-grid">
-        <article class="governance-card"><strong>Tenant isolado</strong><p>A organização é validada no backend a partir da sessão ativa; o payload não define tenant, ator ou permissões.</p></article>
-        <article class="governance-card"><strong>Allowlist de parâmetros</strong><p>Somente parâmetros conhecidos são persistidos. Campos extras e tentativas de elevação de privilégio são rejeitados.</p></article>
-        <article class="governance-card"><strong>Sem segredos</strong><p>A parametrização não aceita senhas, tokens, chaves de API ou conteúdo bruto de documentos.</p></article>
-        <article class="governance-card"><strong>Concorrência segura</strong><p>Cada gravação exige a versão lida; alterações concorrentes recebem conflito e precisam ser recarregadas.</p></article>
-      </div>
-
-      <section class="audit-section" aria-labelledby="audit-heading">
-        <div class="audit-head">
-          <h3 id="audit-heading">Alterações recentes</h3>
-          <span id="auditCount" class="badge neutral">0 registros</span>
+      <section id="panel-users" class="panel tab-panel" data-panel="users" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">IDENTITY LIFECYCLE</span>
+            <h2>Usuários</h2>
+            <p>Gerencie o ciclo de vida das identidades da organização ativa. E-mail é a chave de identidade e não é alterado nesta fase.</p>
+          </div>
+          <button id="newUserButton" class="btn btn-primary" type="button">+ Novo usuário</button>
         </div>
+
+        <div class="toolbar users-toolbar">
+          <label class="search-field grow">
+            <span class="sr-only">Buscar usuário</span>
+            <input id="userSearchInput" type="search" placeholder="Buscar por nome ou e-mail…" autocomplete="off" />
+          </label>
+          <label class="filter-field"><span>Status</span><select id="userStatusFilter"><option value="">Todos</option><option value="ACTIVE">Ativos</option><option value="DISABLED">Suspensos</option></select></label>
+          <label class="filter-field"><span>Papel</span><select id="userRoleFilter"><option value="">Todos</option><option value="E3I_ADMIN">Administrador</option><option value="OPERATOR">Operador</option></select></label>
+        </div>
+
+        <div class="table-shell">
+          <table class="data-table">
+            <thead><tr><th>Usuário</th><th>Papel</th><th>Status</th><th>Segurança</th><th>Sessões</th><th class="actions-column">Ações</th></tr></thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+          <div id="usersEmpty" class="empty-state" hidden>Nenhum usuário corresponde aos filtros.</div>
+        </div>
+      </section>
+
+      <section id="panel-access" class="panel tab-panel" data-panel="access" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">ENTITLEMENTS</span>
+            <h2>Acessos às ferramentas</h2>
+            <p>Concessões por organização continuam usando os contratos atuais do Portal; autorização real permanece no backend.</p>
+          </div>
+          <label class="search-field"><span class="sr-only">Buscar ferramenta</span><input id="searchInput" type="search" placeholder="Buscar ferramenta…" autocomplete="off" /></label>
+        </div>
+        <div id="toolsGrid" class="tools-grid" aria-live="polite" aria-busy="true"></div>
+      </section>
+
+      <section id="panel-parameters" class="panel tab-panel" data-panel="parameters" hidden>
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">PARAMETRIZAÇÃO</span>
+            <h2>E3I Intelligence</h2>
+            <p>Registro central governado. Salvar estes valores não altera automaticamente as ferramentas operacionais.</p>
+          </div>
+          <div class="panel-actions"><button id="reloadSettings" type="button" class="btn btn-secondary">Recarregar</button><button id="saveSettings" type="button" class="btn btn-primary">Salvar parâmetros</button></div>
+        </div>
+        <div class="notice safe-defaults"><strong>Guardrail:</strong> Intelligence e ingestão permanecem desligados por padrão; agentes não podem operar em modo de escrita nesta tela.</div>
+        <form id="settingsForm" class="settings-layout" autocomplete="off" novalidate>
+          <fieldset class="settings-card">
+            <legend>Ativação e agentes</legend>
+            <label class="switch-row"><span><strong>Habilitar E3I Intelligence</strong><small>Autoriza consumo futuro desta configuração.</small></span><input id="intelligenceEnabled" type="checkbox" /></label>
+            <label class="switch-row"><span><strong>Habilitar ingestão</strong><small>Autoriza futura ingestão; não cria integração automaticamente.</small></span><input id="ingestionEnabled" type="checkbox" /></label>
+            <label class="field-row"><span><strong>Modo dos agentes</strong><small>Somente desabilitado ou leitura.</small></span><select id="agentMode"><option value="DISABLED">Desabilitados</option><option value="READ_ONLY">Somente leitura</option></select></label>
+            <label class="switch-row"><span><strong>Aprovação humana obrigatória</strong><small>Ações relevantes exigem confirmação humana.</small></span><input id="requireHumanApproval" type="checkbox" /></label>
+            <label class="switch-row danger-row"><span><strong>Permitir dados pessoais sensíveis</strong><small>Somente com governança e finalidade específicas.</small></span><input id="allowSensitivePersonalData" type="checkbox" /></label>
+          </fieldset>
+          <fieldset class="settings-card">
+            <legend>LGPD e retenção</legend>
+            <label class="field-stack"><span>Retenção padrão</span><select id="defaultRetentionClass"><option value="EPHEMERAL_30D">Efêmera — 30 dias</option><option value="OPERATIONAL_1Y">Operacional — 1 ano</option><option value="ANALYTICS_2Y">Analytics — 2 anos</option><option value="AUDIT_POLICY">Política de auditoria</option><option value="CUSTOM_POLICY">Política customizada</option></select></label>
+            <label class="field-stack"><span>Finalidade padrão de mapeamento</span><input id="mappingPurposeId" type="text" maxlength="120" placeholder="process-mapping-v1" spellcheck="false" /><small>Identificador governado; não informe nome, e-mail, CPF ou outro dado pessoal.</small></label>
+            <label class="field-row"><span><strong>Nível de auditoria</strong><small>Metadados de auditoria esperados.</small></span><select id="auditLevel"><option value="STANDARD">Padrão</option><option value="ENHANCED">Reforçado</option></select></label>
+            <label class="switch-row"><span><strong>Validação humana de saving</strong><small>Saving validado somente após confirmação humana.</small></span><input id="savingValidationRequired" type="checkbox" /></label>
+          </fieldset>
+        </form>
+      </section>
+
+      <section id="panel-security" class="panel tab-panel" data-panel="security" hidden>
+        <div class="panel-head"><div><span class="eyebrow">SECURITY CENTER</span><h2>Segurança e governança</h2><p>Controles ativos e capacidades de identidade previstas para a evolução do Portal.</p></div></div>
+        <div class="governance-grid">
+          <article class="governance-card"><span class="control-status active">ATIVO</span><strong>Isolamento por organização</strong><p>Organização e ator vêm da sessão autenticada; payload não pode escolher tenant ou permissão.</p></article>
+          <article class="governance-card"><span class="control-status active">ATIVO</span><strong>Proteção administrativa</strong><p>Bloqueio de auto-suspensão e de remoção do último E3I_ADMIN ativo.</p></article>
+          <article class="governance-card"><span class="control-status active">ATIVO</span><strong>Senha sem compartilhamento</strong><p>Novos usuários usam o fluxo de primeiro acesso com código por e-mail e hash Argon2.</p></article>
+          <article class="governance-card"><span class="control-status active">ATIVO</span><strong>Soft revoke</strong><p>Suspensão preserva evidência e referências; sessões existentes são revogadas.</p></article>
+          <article class="governance-card future"><span class="control-status planned">ROADMAP</span><strong>MFA e políticas de autenticação</strong><p>Estrutura preparada para política central de MFA sem simular uma função ainda inexistente.</p></article>
+          <article class="governance-card future"><span class="control-status planned">ROADMAP</span><strong>SSO / SCIM / grupos</strong><p>Provisionamento corporativo, grupos e revisões periódicas de acesso entram em fase própria.</p></article>
+        </div>
+      </section>
+
+      <section id="panel-audit" class="panel tab-panel" data-panel="audit" hidden>
+        <div class="panel-head"><div><span class="eyebrow">AUDIT TRAIL</span><h2>Alterações administrativas</h2><p>Eventos de identidade e parametrização registrados sem senhas, tokens ou códigos de acesso.</p></div><button id="reloadAudit" class="btn btn-secondary" type="button">Atualizar</button></div>
+        <div class="audit-head"><span id="auditCount" class="badge neutral">0 registros</span></div>
         <div id="auditList" class="audit-list" aria-live="polite"></div>
       </section>
-    </section>
-  </main>
+    </main>
+  </div>
+
+  <dialog id="userDialog" class="form-dialog">
+    <form id="userForm" method="dialog">
+      <div class="dialog-header"><div><span class="eyebrow">IDENTIDADE</span><h2 id="userDialogTitle">Novo usuário</h2></div><button type="button" id="closeUserDialog" class="icon-button" aria-label="Fechar">×</button></div>
+      <input id="editingUserId" type="hidden" />
+      <label class="field-stack"><span>Nome completo</span><input id="userName" type="text" maxlength="160" autocomplete="off" required /></label>
+      <label class="field-stack"><span>E-mail</span><input id="userEmail" type="email" maxlength="254" autocomplete="off" required /><small id="userEmailHint">O e-mail será usado como identidade de acesso.</small></label>
+      <label class="field-stack"><span>Papel no Portal</span><select id="userRole"><option value="OPERATOR">Operador</option><option value="E3I_ADMIN">Administrador E3I</option></select><small>Administrador pode gerir usuários, acessos e parâmetros. Use menor privilégio.</small></label>
+      <label id="sendInviteRow" class="switch-row"><span><strong>Enviar código de primeiro acesso</strong><small>A conta também poderá solicitar novo código na tela de login.</small></span><input id="sendInvite" type="checkbox" checked /></label>
+      <div class="dialog-actions"><button type="button" id="cancelUserDialog" class="btn btn-secondary">Cancelar</button><button type="submit" id="saveUser" class="btn btn-primary">Criar usuário</button></div>
+    </form>
+  </dialog>
 
   <dialog id="confirmDialog" class="confirm-dialog">
     <form method="dialog">
       <span class="eyebrow">CONFIRMAR ALTERAÇÃO</span>
       <h2 id="confirmTitle">Confirmar alteração?</h2>
       <p id="confirmMessage"></p>
-      <div class="dialog-actions">
-        <button value="cancel" class="btn btn-secondary">Cancelar</button>
-        <button value="confirm" class="btn btn-danger">Confirmar</button>
-      </div>
+      <div class="dialog-actions"><button value="cancel" class="btn btn-secondary">Cancelar</button><button value="confirm" class="btn btn-danger">Confirmar</button></div>
     </form>
   </dialog>
 
