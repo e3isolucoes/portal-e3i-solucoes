@@ -15,6 +15,9 @@ COPY test-admin-central.cjs /tmp/test-admin-central.cjs
 COPY admin-users-server-snippet.txt /tmp/admin-users-server-snippet.txt
 COPY patch-admin-users.cjs /tmp/patch-admin-users.cjs
 COPY test-admin-users.cjs /tmp/test-admin-users.cjs
+COPY brand-assets-server-snippet.txt /tmp/brand-assets-server-snippet.txt
+COPY patch-brand-assets.cjs /tmp/patch-brand-assets.cjs
+COPY test-brand-assets.cjs /tmp/test-brand-assets.cjs
 
 COPY client-tool-auth.js /app/dist/client-tool-auth.js
 COPY first-login.js /app/dist/first-login.js
@@ -26,6 +29,7 @@ COPY migrate-gra-users.cjs /app/migrate-gra-users.cjs
 RUN node /tmp/patch-first-login.cjs \
  && node /tmp/patch-admin-central.cjs \
  && node /tmp/patch-admin-users.cjs \
+ && node /tmp/patch-brand-assets.cjs \
  && node --check /app/dist/server.cjs \
  && node --check /app/dist/admin-central.js \
  && node --check /app/dist/admin-ferramentas.js \
@@ -34,6 +38,7 @@ RUN node /tmp/patch-first-login.cjs \
  && node --check /app/migrate-gra-users.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_PATCH_SCRIPT=/tmp/patch-admin-central.cjs E3I_ADMIN_SNIPPET=/tmp/admin-central-server-snippet.txt node /tmp/test-admin-central.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_USERS_PATCH_SCRIPT=/tmp/patch-admin-users.cjs E3I_ADMIN_USERS_SNIPPET=/tmp/admin-users-server-snippet.txt node /tmp/test-admin-users.cjs \
+ && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_BRAND_PATCH_SCRIPT=/tmp/patch-brand-assets.cjs E3I_ADMIN_BRAND_SNIPPET=/tmp/brand-assets-server-snippet.txt E3I_ADMIN_BRAND_LOGO_FILE=/app/dist/e3i-logo.svg node /tmp/test-brand-assets.cjs \
  && test -s /app/dist/e3i-logo.svg \
  && test -s /app/dist/admin-ferramentas.html \
  && test -s /app/dist/admin-ferramentas.css \
@@ -56,6 +61,8 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq 'admin-central.js' /app/dist/admin-central.html \
  && grep -Fq 'E3I_ADMIN_CENTRAL_PATCH_V1' /app/dist/server.cjs \
  && grep -Fq 'E3I_ADMIN_USERS_PATCH_V1' /app/dist/server.cjs \
+ && grep -Fq 'E3I_ADMIN_BRAND_ASSETS_PATCH_V1' /app/dist/server.cjs \
+ && grep -Fq "app.get('/e3i-logo.svg'" /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/users' /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/central-settings' /app/dist/server.cjs \
  && grep -Fq 'SELF_REVOKE_BLOCKED' /app/dist/server.cjs \
@@ -73,6 +80,7 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq 'data-e3i-first-login-start' /app/dist/first-login.js \
  && grep -Fq '/first-login.js' /app/dist/index.html \
  && echo 'PORTAL_ADMIN_CENTRAL_V2_VALIDATION_OK' \
+ && echo 'PORTAL_ADMIN_BRAND_ASSET_VALIDATION_OK' \
  && echo 'PORTAL_CLIENT_TOOL_AUTH_VALIDATION_OK' \
  && echo 'PORTAL_FIRST_LOGIN_TRANSPORT_VALIDATION_OK'
 
