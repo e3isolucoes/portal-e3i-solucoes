@@ -141,6 +141,32 @@ function e3iAdminCentralUserDto(user, principal) {
 function e3iAdminCentralAudit(principal, action, targetUserId, detail = '') {
   e3iAdminCentralLiveAudit().unshift({ id: `log-${Date.now()}-${e3iAdminCentralCrypto.randomBytes(3).toString('hex')}`, timestamp: new Date().toISOString(), actorId: principal.actorId, userId: targetUserId, action, module: 'Administração', status: 'SUCCESS', details: String(detail || '').slice(0, 180) });
 }
+function e3iAdminCentralSyncMembership(user, organizationId, occurredAt = new Date().toISOString()) {
+  const dataset = e3iAdminCentralReadJson(E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE, {});
+  const memberships = dataset?.tables?.organization_memberships?.data;
+  const tenants = dataset?.tables?.tenants?.data;
+  if (!Array.isArray(memberships) || !Array.isArray(tenants)) throw Object.assign(new Error('Estrutura de associação da organização indisponível.'), { status: 500, code: 'MEMBERSHIP_STORE_UNAVAILABLE' });
+  const userId = String(user?.id || user?.userId || '');
+  const organization = String(organizationId || '');
+  if (!userId || !organization) throw Object.assign(new Error('Identidade ou organização inválida.'), { status: 500, code: 'MEMBERSHIP_CONTEXT_INVALID' });
+  const role = e3iAdminCentralUserRole(user);
+  const status = e3iAdminCentralUserStatus(user) === 'ACTIVE' ? 'ACTIVE' : 'DISABLED';
+  let membership = memberships.find((entry) => String(entry?.userId || entry?.memberId || '') === userId && String(entry?.organizationId || entry?.tenantId || '') === organization);
+  if (!membership) {
+    membership = { id: `mem-${e3iAdminCentralCrypto.randomUUID()}`, userId, organizationId: organization, role, status, joinedAt: occurredAt };
+    memberships.push(membership);
+  } else {
+    membership.userId = userId; membership.organizationId = organization; membership.role = role; membership.status = status; membership.updatedAt = occurredAt;
+    if (!membership.joinedAt) membership.joinedAt = occurredAt;
+  }
+  if (dataset.tables?.organization_memberships) dataset.tables.organization_memberships.rowsCount = memberships.length;
+  if (dataset.tables?.users && Array.isArray(dataset.tables.users.data)) dataset.tables.users.rowsCount = dataset.tables.users.data.length;
+  const tenant = tenants.find((entry) => String(entry?.id || '') === organization);
+  if (!tenant) throw Object.assign(new Error('Organização persistida não encontrada.'), { status: 500, code: 'ORGANIZATION_STORE_NOT_FOUND' });
+  tenant.usersCount = new Set(memberships.filter((entry) => String(entry?.organizationId || entry?.tenantId || '') === organization && String(entry?.status || 'ACTIVE').toUpperCase() === 'ACTIVE').map((entry) => String(entry?.userId || entry?.memberId || '')).filter(Boolean)).size;
+  dataset.lastSyncAt = occurredAt;
+  e3iAdminCentralWriteJsonAtomic(E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE, dataset);
+}
 function e3iAdminCentralValidateRole(value) { const role = String(value || '').toUpperCase(); if (!E3I_ADMIN_CENTRAL_USER_ROLES.has(role)) throw Object.assign(new Error('Papel de usuário inválido.'), { status: 400, code: 'INVALID_USER_ROLE' }); return role; }
 function e3iAdminCentralValidateName(value) { const name = e3iAdminCentralSafeText(value, 160); if (!name || name.length < 2) throw Object.assign(new Error('Nome de usuário inválido.'), { status: 400, code: 'INVALID_USER_NAME' }); return name; }
 function e3iAdminCentralValidateEmail(value) { const email = String(value || '').trim().toLowerCase(); if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('E-mail inválido.'), { status: 400, code: 'INVALID_USER_EMAIL' }); return email; }
@@ -183,6 +209,7 @@ app.post('/api/admin/organizations/:organizationId/users', async (req, res) => {
     e3iAdminCentralLiveUsers().push(user); e3iAdminCentralAudit(principal, 'ADMIN_USER_CREATED', user.id, `role:${role}`); saveStorage();
     let inviteDelivery = 'NOT_REQUESTED';
     if (body.sendInvite === true) { try { await e3iIssuePasswordSetupCode(user); inviteDelivery = 'SENT'; } catch (_) { inviteDelivery = 'FAILED'; console.error('[admin-central] first-access delivery failed'); } }
+    e3iAdminCentralSyncMembership(user, principal.organizationId, now);
     return res.status(201).json({ user: e3iAdminCentralUserDto(user, principal), inviteDelivery });
   } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível criar o usuário.'); }
 });
@@ -194,7 +221,7 @@ app.patch('/api/admin/organizations/:organizationId/users/:userId', (req, res) =
     const nextName = body.name === undefined ? String(target.name || '') : e3iAdminCentralValidateName(body.name); const nextRole = body.role === undefined ? e3iAdminCentralUserRole(target) : e3iAdminCentralValidateRole(body.role);
     e3iAdminCentralProtectAdmin(principal, target, nextRole, e3iAdminCentralUserStatus(target)); const roleChanged = nextRole !== e3iAdminCentralUserRole(target);
     target.name = nextName; target.role = nextRole; target.systemRole = nextRole; target.updatedAt = new Date().toISOString(); if (roleChanged) e3iAdminCentralRevokeSessions(target.id || target.userId);
-    e3iAdminCentralAudit(principal, 'ADMIN_USER_UPDATED', target.id || target.userId, roleChanged ? 'role_changed' : 'profile_changed'); saveStorage(); return res.json({ user: e3iAdminCentralUserDto(target, principal) });
+    e3iAdminCentralAudit(principal, 'ADMIN_USER_UPDATED', target.id || target.userId, roleChanged ? 'role_changed' : 'profile_changed'); saveStorage(); e3iAdminCentralSyncMembership(target, principal.organizationId, target.updatedAt); return res.json({ user: e3iAdminCentralUserDto(target, principal) });
   } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível atualizar o usuário.'); }
 });
 app.post('/api/admin/organizations/:organizationId/users/:userId/status', (req, res) => {
@@ -203,7 +230,7 @@ app.post('/api/admin/organizations/:organizationId/users/:userId/status', (req, 
     const target = e3iAdminCentralFindLiveUser(principal.organizationId, req.params.userId); if (!target) return res.status(404).json({ code: 'NOT_FOUND', error: 'Recurso não encontrado.' });
     e3iAdminCentralProtectAdmin(principal, target, e3iAdminCentralUserRole(target), status); target.status = status; target.updatedAt = new Date().toISOString();
     if (status === 'DISABLED') { e3iAdminCentralRevokeSessions(target.id || target.userId); if (typeof e3iClearPasswordSetup === 'function') e3iClearPasswordSetup(target); }
-    e3iAdminCentralAudit(principal, status === 'ACTIVE' ? 'ADMIN_USER_REACTIVATED' : 'ADMIN_USER_SUSPENDED', target.id || target.userId, `status:${status}`); saveStorage(); return res.json({ user: e3iAdminCentralUserDto(target, principal) });
+    e3iAdminCentralAudit(principal, status === 'ACTIVE' ? 'ADMIN_USER_REACTIVATED' : 'ADMIN_USER_SUSPENDED', target.id || target.userId, `status:${status}`); saveStorage(); e3iAdminCentralSyncMembership(target, principal.organizationId, target.updatedAt); return res.json({ user: e3iAdminCentralUserDto(target, principal) });
   } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível alterar o status do usuário.'); }
 });
 app.post('/api/admin/organizations/:organizationId/users/:userId/revoke-sessions', (req, res) => {
@@ -220,6 +247,7 @@ app.post('/api/admin/organizations/:organizationId/users/:userId/require-first-l
     if (e3iAdminCentralUserStatus(target) !== 'ACTIVE') return res.status(409).json({ code: 'USER_DISABLED', error: 'Reative o usuário antes de exigir novo primeiro acesso.' });
     target.mustChangePassword = true; target.passwordOnboardingVersion = 0; target.updatedAt = new Date().toISOString(); if (typeof e3iClearPasswordSetup === 'function') e3iClearPasswordSetup(target); e3iAdminCentralRevokeSessions(target.id || target.userId); e3iAdminCentralAudit(principal, 'ADMIN_USER_FIRST_LOGIN_REQUIRED', target.id || target.userId, 'secure_first_login'); saveStorage();
     let delivery = 'NOT_REQUESTED'; if (req.body?.sendCode === true) { try { await e3iIssuePasswordSetupCode(target); delivery = 'SENT'; } catch (_) { delivery = 'FAILED'; console.error('[admin-central] password-reset delivery failed'); } }
+    e3iAdminCentralSyncMembership(target, principal.organizationId, target.updatedAt);
     return res.json({ success: true, delivery, user: e3iAdminCentralUserDto(target, principal) });
   } catch (error) { return e3iAdminCentralUserError(res, error, 'Não foi possível exigir novo primeiro acesso.'); }
 });
