@@ -29,9 +29,9 @@ test('registro rejeita contratos inválidos e duplicados', () => {
   assert.throws(() => registry.register({ id: 'sem-render' }), /render/);
 });
 
-test('concessões explícitas de módulo aplicam deny-by-default', () => {
+test('obrigações permanecem acessíveis para usuário ativo mesmo com grants explícitos vazios', () => {
   const restrictedContext = moduleContext({
-    state: { profile: { workspace_id: 'empresa-a', module_grants: ['obrigacoes'] }, session: { id: 'user-a' } },
+    state: { profile: { workspace_id: 'empresa-a', active: true, module_grants: [] }, session: { id: 'user-a' } },
     permissions: { manager: true }
   });
   const registry = new ModuleRegistry()
@@ -41,8 +41,10 @@ test('concessões explícitas de módulo aplicam deny-by-default', () => {
   assert.equal(registry.get('reports', restrictedContext), null);
 });
 
-test('perfil legado preserva módulos e perfil parametrizado oculta não concedidos', () => {
+test('perfil legado preserva módulos e somente obrigações viram capacidade básica', () => {
   assert.equal(hasModuleGrant({}, 'relatorios'), true);
-  assert.equal(hasModuleGrant({ module_grants: ['obrigacoes'] }, 'relatorios'), false);
-  assert.equal(hasModuleGrant({ module_grants: ['obrigacoes'] }, 'obrigacoes'), true);
+  assert.equal(hasModuleGrant({ active: true, module_grants: [] }, 'obrigacoes'), true);
+  assert.equal(hasModuleGrant({ active: true, module_grants: [] }, 'relatorios'), false);
+  assert.equal(hasModuleGrant({ active: true, module_grants: ['obrigacoes'] }, 'relatorios'), false);
+  assert.equal(hasModuleGrant({ active: false, module_grants: [] }, 'obrigacoes'), false);
 });
