@@ -1,4 +1,5 @@
 const MODULE_ID = /^[a-z][a-z0-9-]{1,63}$/;
+const BASELINE_MODULE_GRANTS = new Set(['obrigacoes']);
 
 function validateModule(module) {
   if (!module || !MODULE_ID.test(module.id || '')) throw new TypeError('Módulo com identificador inválido.');
@@ -15,6 +16,7 @@ function isAccessible(module, context) {
 }
 
 export function hasModuleGrant(profile, grant) {
+  if (BASELINE_MODULE_GRANTS.has(grant) && profile?.active !== false) return true;
   return !Array.isArray(profile?.module_grants) || profile.module_grants.includes(grant);
 }
 
@@ -48,12 +50,21 @@ export class ModuleRegistry {
 
 export function moduleContext({ state, permissions }) {
   const configuredGrants = state.profile?.module_grants;
+  const activeSession = Boolean(state.session && state.profile && state.profile.active !== false);
+  const moduleGrants = Array.isArray(configuredGrants)
+    ? new Set([
+        ...configuredGrants,
+        ...(activeSession ? BASELINE_MODULE_GRANTS : []),
+      ])
+    : null;
+
   return Object.freeze({
     state,
     permissions: Object.freeze({ ...permissions }),
     workspaceId: state.profile?.workspace_id || null,
     userId: state.session?.id || null,
-    // Ausência preserva compatibilidade. Um array presente é deny-by-default.
-    moduleGrants: Array.isArray(configuredGrants) ? new Set(configuredGrants) : null
+    // Obrigações são capacidade operacional básica de todo usuário ativo.
+    // Demais grants explícitos continuam deny-by-default.
+    moduleGrants
   });
 }
