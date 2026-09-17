@@ -5,6 +5,7 @@ import { canonicalRole } from './contract.mjs';
 import { requireWorkspaceAvailable } from './workspace-access.mjs';
 
 const jwksByIssuer = new Map();
+const BASELINE_MODULE_GRANTS = new Set(['obrigacoes']);
 
 export function normalizeSupabaseIssuer(value) {
   const issuer = String(value || '').replace(/\/+$/, '');
@@ -87,6 +88,9 @@ export function requireRole(auth, roles) {
 }
 
 export function requireModuleGrant(auth, grant) {
+  // Usuários que chegaram até aqui já possuem associação ativa ao workspace.
+  // Obrigações e comprovantes fazem parte da operação básica desse acesso.
+  if (!grant || BASELINE_MODULE_GRANTS.has(grant)) return;
   if (!Array.isArray(auth.moduleGrants)) return;
   if (!auth.moduleGrants.includes(grant)) {
     throw Object.assign(new Error('Módulo não concedido para este acesso.'), { statusCode: 403 });
