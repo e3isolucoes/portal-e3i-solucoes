@@ -57,7 +57,8 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq 'force-first-login' /app/dist/admin-central.js \
  && grep -Fq 'central-settings' /app/dist/admin-central.js \
  && grep -Fq 'x-e3i-admin-request' /app/dist/admin-central.js \
- && grep -Fq '/e3i-logo.svg' /app/dist/admin-central.html \
+ && grep -Fq 'data-e3i-brand-inline="1"' /app/dist/admin-central.html \
+ && ! grep -Eq '<img[^>]+src="/e3i-logo\\.svg"' /app/dist/admin-central.html \
  && grep -Fq 'admin-central.js' /app/dist/admin-central.html \
  && grep -Fq 'E3I_ADMIN_CENTRAL_PATCH_V1' /app/dist/server.cjs \
  && grep -Fq 'E3I_ADMIN_USERS_PATCH_V1' /app/dist/server.cjs \
