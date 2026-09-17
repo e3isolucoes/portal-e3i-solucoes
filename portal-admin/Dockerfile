@@ -62,7 +62,7 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq 'admin-central.js' /app/dist/admin-central.html \
  && grep -Fq 'E3I_ADMIN_CENTRAL_PATCH_V1' /app/dist/server.cjs \
  && grep -Fq 'E3I_ADMIN_USERS_PATCH_V1' /app/dist/server.cjs \
- && grep -Fq 'E3I_ADMIN_BRAND_ASSETS_PATCH_V1' /app/dist/server.cjs \
+ && grep -Fq 'E3I_ADMIN_BRAND_ASSETS_PATCH_V2' /app/dist/server.cjs \
  && grep -Fq "app.get('/e3i-logo.svg'" /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/users' /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/central-settings' /app/dist/server.cjs \
