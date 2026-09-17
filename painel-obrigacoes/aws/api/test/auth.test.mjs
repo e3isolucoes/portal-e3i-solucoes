@@ -20,8 +20,11 @@ test('aceita somente os emissores Cognito e Supabase explicitamente configurados
   ]);
 });
 
-test('nega módulo não concedido no backend e preserva associações legadas', () => {
+test('obrigações são capacidade operacional básica e demais módulos continuam protegidos', () => {
   assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: null }, 'obrigacoes'));
+  assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: [] }, 'obrigacoes'));
+  assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: ['relatorios'] }, 'obrigacoes'));
   assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: ['obrigacoes'] }, 'obrigacoes'));
   assert.throws(() => requireModuleGrant({ moduleGrants: ['obrigacoes'] }, 'administracao'), /não concedido/i);
+  assert.throws(() => requireModuleGrant({ moduleGrants: [] }, 'relatorios'), /não concedido/i);
 });
