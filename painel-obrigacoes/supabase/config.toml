@@ -1,0 +1,10 @@
+project_id = "painel-obrigacoes"
+
+[db.seed]
+enabled = false
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
