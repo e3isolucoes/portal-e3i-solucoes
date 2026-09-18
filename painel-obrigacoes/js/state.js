@@ -100,6 +100,34 @@ export function competenceForOccurrence(obligation, occurrenceDate) {
   return new Date(year, monthIndex - offset, 1);
 }
 
+export function obligationForCompletion(completion, currentObligation = null) {
+  const base = currentObligation || { id: completion?.obligation_id || null };
+  const directSnapshot = completion?.obligation_snapshot;
+  if (directSnapshot && typeof directSnapshot === 'object' && !Array.isArray(directSnapshot)) {
+    return { ...base, ...directSnapshot };
+  }
+
+  const completedAt = String(completion?.done_at || completion?.created_at || '');
+  const history = Array.isArray(base?.structure_history)
+    ? base.structure_history
+      .filter((entry) => entry?.snapshot && entry?.effective_until)
+      .slice()
+      .sort((a, b) => String(a.effective_until).localeCompare(String(b.effective_until)))
+    : [];
+  const historical = completedAt
+    ? history.find((entry) => completedAt <= String(entry.effective_until))
+    : null;
+  return historical ? { ...base, ...historical.snapshot } : base;
+}
+
+export function competenceForCompletion(completion, currentObligation = null) {
+  const frozen = String(completion?.competence_date || '');
+  const match = /^(\d{4})-(\d{2})/.exec(frozen);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, 1);
+  const historicalObligation = obligationForCompletion(completion, currentObligation);
+  return competenceForOccurrence(historicalObligation, completion?.occurrence_date);
+}
+
 export function competenceKey(dateValue) {
   if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) return '';
   return `${dateValue.getFullYear()}-${String(dateValue.getMonth() + 1).padStart(2, '0')}`;
