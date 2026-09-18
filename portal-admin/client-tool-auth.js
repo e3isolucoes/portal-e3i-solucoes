@@ -29,6 +29,10 @@
     return isSameOriginPath(value, (path) => path === '/api/auth/login');
   }
 
+  function isLogoutUrl(value) {
+    return isSameOriginPath(value, (path) => path === '/api/auth/logout');
+  }
+
   function isClientToolsUrl(value) {
     return isSameOriginPath(value, (path) => path === '/api/client-tools' || path.startsWith('/api/client-tools/'));
   }
@@ -103,6 +107,7 @@
   window.fetch = async (input, init) => {
     const sessionRequest = isSessionUrl(input);
     const loginRequest = isLoginUrl(input);
+    const logoutRequest = isLogoutUrl(input);
     const clientToolRequest = isClientToolsUrl(input);
     const adminAccessRequest = isAdminAccessUrl(input);
     const [preparedInput, preparedInit] = prepareClientToolFetch(input, init);
@@ -112,9 +117,14 @@
       if (sessionRequest && response.ok) {
         const payload = await response.clone().json().catch(() => ({}));
         if (hasAuthenticatedUser(payload)) { rememberSessionTransport(input, init); queueMicrotask(refreshAdminEntry); }
+        else { activeAuthorization = ''; sessionAuthMode = 'unknown'; removeAdminEntry(); }
       } else if (loginRequest && response.ok) {
         const payload = await response.clone().json().catch(() => ({}));
         rememberLoginToken(payload); queueMicrotask(refreshAdminEntry);
+      } else if (logoutRequest && response.ok) {
+        activeAuthorization = '';
+        sessionAuthMode = 'unknown';
+        removeAdminEntry();
       }
 
       // Defensive fallback: if a valid bearer captured from the active session was
@@ -208,6 +218,7 @@
       const requestUrl = this.__e3iAuthBridgeUrl || '';
       const sessionRequest = isSessionUrl(requestUrl);
       const loginRequest = isLoginUrl(requestUrl);
+      const logoutRequest = isLogoutUrl(requestUrl);
       const clientToolRequest = isClientToolsUrl(requestUrl);
 
       if (clientToolRequest) {
@@ -219,9 +230,15 @@
         }
       }
 
-      if (sessionRequest || loginRequest) {
+      if (sessionRequest || loginRequest || logoutRequest) {
         this.addEventListener('load', () => {
           if (this.status < 200 || this.status >= 300) return;
+          if (logoutRequest) {
+            activeAuthorization = '';
+            sessionAuthMode = 'unknown';
+            removeAdminEntry();
+            return;
+          }
           try {
             const payload = JSON.parse(this.responseText || '{}');
             if (sessionRequest && hasAuthenticatedUser(payload)) {
@@ -232,8 +249,13 @@
                 activeAuthorization = '';
                 sessionAuthMode = 'cookie';
               }
+              queueMicrotask(refreshAdminEntry);
+            } else if (sessionRequest) {
+              activeAuthorization = '';
+              sessionAuthMode = 'unknown';
+              removeAdminEntry();
             }
-            if (loginRequest) rememberLoginToken(payload);
+            if (loginRequest) { rememberLoginToken(payload); queueMicrotask(refreshAdminEntry); }
           } catch {
             // Ignore non-JSON authentication responses.
           }
