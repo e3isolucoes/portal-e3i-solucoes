@@ -10,3 +10,6 @@ aws-cli-install.log
 .migration/
 .tools/
 .DS_Store
+
+supabase/
+sql/schema.generated.sql
