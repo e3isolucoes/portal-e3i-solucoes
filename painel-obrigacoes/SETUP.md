@@ -370,10 +370,8 @@ da Resend.
 
 O schedule é criado desabilitado. Valide primeiro uma invocação controlada e a
 identidade/domínio SES conforme `aws/README.md`; só então altere
-`NotificationScheduleState` para `ENABLED` por processo de deploy aprovado. O
-workflow `alertas-diarios.yml` é apenas uma validação manual e não envia e-mail.
-Para emergência existe `scripts/enviar-alertas-legacy-supabase.mjs`, não agendado
-e claramente restrito a rollback manual.
+`NotificationScheduleState` para `ENABLED` por processo de deploy aprovado.
+A validação do serviço de notificações faz parte do pipeline AWS.
 
 ## Onde pedir ajuda
 
