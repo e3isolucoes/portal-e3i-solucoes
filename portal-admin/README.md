@@ -3,7 +3,6 @@
 Esta pasta entrega extensões controladas sobre a imagem já validada do Portal E3I:
 
 - administração central de acessos e parâmetros;
-- tela clássica de concessões de ferramentas;
 - reconciliação dos usuários migrados da GRA Comércio;
 - fluxo obrigatório de definição de senha segura no primeiro acesso.
 
@@ -19,7 +18,7 @@ Ela consolida três áreas:
 2. **Parâmetros** — mantém um registro central, por organização, para parâmetros governados do E3I Intelligence;
 3. **Governança** — apresenta os guardrails de tenant, allowlist, concorrência e o histórico recente de mudanças.
 
-A tela clássica continua disponível em `/admin-ferramentas.html` como fallback operacional. Nenhum contrato existente foi removido.
+`/admin-central.html` é a única interface administrativa mantida neste overlay. A tela clássica foi removida para evitar duas superfícies com a mesma responsabilidade.
 
 ## Segurança e contrato de ferramentas
 
@@ -85,7 +84,7 @@ As contas reconciliadas são `fiscal@gracomercio.com.br`, `nfe@gracomercio.com.b
 
 ## QA da administração central
 
-`test-admin-central.cjs` valida os contratos estáticos da tela, defaults seguros, ausência de storage no navegador para os parâmetros, preservação da tela clássica, requisitos do patch do servidor e idempotência do patch usando uma fixture de `server.cjs`.
+`test-admin-central.cjs` valida os contratos estáticos da tela, defaults seguros, ausência de storage no navegador para os parâmetros, requisitos do patch do servidor e idempotência do patch usando uma fixture de `server.cjs`.
 
 O workflow `Portal Admin Central Validate` executa esses testes em cada PR que toca `portal-admin/**`. O build da imagem também executa o mesmo teste e verifica o bundle final.
 
@@ -121,7 +120,6 @@ Crie uma nova revisão em modo `Multiple`, inicialmente sem retirar tráfego da 
 O teste funcional mínimo deve confirmar:
 
 - login e Portal existentes continuam funcionando;
-- `/admin-ferramentas.html` continua carregando;
 - `/admin-central.html` carrega somente com sessão válida;
 - administrador consegue ler e salvar parâmetros;
 - usuário não administrador recebe `403` nas rotas de parâmetros;
