@@ -15,7 +15,9 @@
     "test:aws-migration": "npm test --prefix aws/migration",
     "aws:validate": "sam validate --lint --template-file aws/template.yaml",
     "aws:build": "sam build --template-file aws/template.yaml",
-    "alertas": "node scripts/enviar-alertas.mjs"
+    "alertas": "node scripts/enviar-alertas.mjs",
+    "schema:generate": "bash scripts/generate-supabase-schema.sh",
+    "schema:verify": "npm run schema:generate && git diff --exit-code -- sql/schema.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3"
