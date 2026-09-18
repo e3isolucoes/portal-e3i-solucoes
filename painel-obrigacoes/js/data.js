@@ -428,8 +428,11 @@ export async function doSaveObligation(id, formData, onDone) {
       showToast(id
         ? 'Seu perfil precisa estar ativo, vinculado ao espaço da empresa e autorizado a alterar esta atividade.'
         : 'Seu perfil precisa estar ativo e vinculado ao espaço da empresa para cadastrar obrigações.', 'error');
-    } else if (Number(err?.status) === 403) {
-      showToast(err?.message || 'Seu perfil não tem permissão para salvar alterações nesta atividade.', 'error');
+    } else if (Number(err?.status) >= 400 && Number(err?.status) < 500) {
+      const fallback = Number(err?.status) === 403
+        ? 'Seu perfil não tem permissão para salvar alterações nesta atividade.'
+        : 'Não foi possível salvar a alteração.';
+      showToast(err?.message || fallback, 'error');
     } else {
       showToast('Não foi possível salvar. Verifique os campos e tente novamente.', 'error');
     }
