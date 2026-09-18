@@ -91,14 +91,14 @@ test('entrada da aplicação invalida módulos anteriores à tela de super admin
   ]);
   const runtimeVersion = index.match(/js\/runtime-config\.js\?(v=[^\"']+)/)?.[1];
   const appVersion = index.match(/js\/app\.js\?(v=[^\"']+)/)?.[1];
-  const moduleVersion = 'v=20260908-csp-wasm-v2';
+  const moduleVersion = 'v=20260917-task-actions-v1';
 
   assert.ok(runtimeVersion, 'runtime-config.js deve ter cache-busting');
   assert.ok(appVersion, 'app.js deve ter cache-busting');
   assert.equal(appVersion, runtimeVersion, 'runtime-config.js e app.js devem invalidar o cache juntos');
   assert.match(app, new RegExp(`data\\.js\\?${moduleVersion}`));
   assert.match(app, new RegExp(`render\\.js\\?${moduleVersion}`));
-  assert.match(render, /data\.js\?v=20260908-csp-wasm-v2/);
+  assert.match(render, new RegExp(`data\\.js\\?${moduleVersion}`));
 });
 
 test('troca de papel espera a seleção efetiva em vez de reagir ao click que abre o combo', async () => {
