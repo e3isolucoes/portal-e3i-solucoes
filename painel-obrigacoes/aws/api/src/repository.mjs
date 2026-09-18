@@ -85,7 +85,7 @@ export class Repository {
     this.requireSafeProfileRoleChange(auth, current, safePatch, false);
     if (entity === 'completions') this.rejectClientManagedCompletionMetadata(safePatch, false, current);
     const lifecyclePatch = entity === 'completions' ? this.completionTransition(auth, current, safePatch) : safePatch;
-    await this.requireRelationships(auth, entity, { ...publicRecord(current), ...lifecyclePatch });
+    await this.requireUpdatedRelationships(auth, entity, current, lifecyclePatch);
     const expectedVersion = Number(safePatch.version ?? current.version ?? 1);
     if (expectedVersion !== Number(current.version ?? 1)) throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
     const item = { ...current, ...lifecyclePatch, version: expectedVersion + 1, updated_at: now() };
@@ -154,6 +154,21 @@ export class Repository {
     for (const [field, targetEntity] of Object.entries(entityRelationships[entity] || {})) {
       const value = record[field];
       if (value == null) continue;
+      const result = await this.client.send(new GetCommand({
+        TableName: this.tableName,
+        Key: { PK: tenantPk(auth.workspaceId), SK: entitySk(targetEntity, value) },
+        ConsistentRead: true
+      }));
+      if (!result.Item) throw Object.assign(new Error(`Referência inválida: ${field}.`), { statusCode: 400 });
+    }
+  }
+
+  async requireUpdatedRelationships(auth, entity, current, patch) {
+    const relationships = entityRelationships[entity] || {};
+    for (const [field, targetEntity] of Object.entries(relationships)) {
+      if (!(field in patch)) continue;
+      const value = patch[field];
+      if (value === current?.[field] || value == null) continue;
       const result = await this.client.send(new GetCommand({
         TableName: this.tableName,
         Key: { PK: tenantPk(auth.workspaceId), SK: entitySk(targetEntity, value) },
