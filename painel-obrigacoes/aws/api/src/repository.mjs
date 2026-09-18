@@ -77,17 +77,22 @@ export class Repository {
     requireModuleGrant(auth, config.writeGrant || config.grant);
     requireRole(auth, config.write);
     const safePatch = validateUpdate(entity, patch);
-    if (safePatch.version === undefined) throw Object.assign(new Error('Campo obrigatório: version.'), { statusCode: 400 });
     const key = { PK: tenantPk(auth.workspaceId), SK: entitySk(entity, id, safePatch) };
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: key, ConsistentRead: true }))).Item;
     if (!current) throw Object.assign(new Error('Registro não encontrado.'), { statusCode: 404 });
+    const legacyWithoutVersion = !Number.isInteger(current.version) || current.version < 1;
+    if (safePatch.version === undefined && !legacyWithoutVersion) {
+      throw Object.assign(new Error('Campo obrigatório: version.'), { statusCode: 400 });
+    }
     if (current.deletion_pending) throw Object.assign(new Error('Registro com exclusão pendente.'), { statusCode: 409 });
     this.requireSafeProfileRoleChange(auth, current, safePatch, false);
     if (entity === 'completions') this.rejectClientManagedCompletionMetadata(safePatch, false, current);
     const lifecyclePatch = entity === 'completions' ? this.completionTransition(auth, current, safePatch) : safePatch;
     await this.requireUpdatedRelationships(auth, entity, current, lifecyclePatch);
-    const expectedVersion = Number(safePatch.version ?? current.version ?? 1);
-    if (expectedVersion !== Number(current.version ?? 1)) throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
+    const expectedVersion = Number(safePatch.version ?? (legacyWithoutVersion ? 1 : current.version));
+    if (!legacyWithoutVersion && expectedVersion !== Number(current.version)) {
+      throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
+    }
     const item = { ...current, ...lifecyclePatch, version: expectedVersion + 1, updated_at: now() };
     const occurrenceChanged = entity === 'completions'
       && (item.obligation_id !== current.obligation_id || item.occurrence_date !== current.occurrence_date);
