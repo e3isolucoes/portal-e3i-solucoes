@@ -17,7 +17,7 @@ import { escapeHtml } from '../dateUtils.js';
  * @param {boolean} isAdmin   se o usuário logado é da Gestão
  */
 export function validatorFieldHtml(ob, profiles = [], isAdmin = false) {
-  const marcado = ob?.requires_validation !== false ? 'checked' : '';
+  const marcado = ob?.requires_validation === true ? 'checked' : '';
   const atual = ob?.validator_id || '';
 
   if (!isAdmin) {
@@ -49,7 +49,7 @@ export function validatorFieldHtml(ob, profiles = [], isAdmin = false) {
   return `
     <div class="field field-validacao">
       <label class="check-inline">
-        <input type="checkbox" id="fRequiresValidation" ${marcado} disabled />
+        <input type="checkbox" id="fRequiresValidation" ${marcado} />
         <span>Exige validação antes de ser concluída</span>
       </label>
       <div class="sub-campo" id="fValidatorWrap" ${marcado ? '' : 'hidden'}>
@@ -59,7 +59,7 @@ export function validatorFieldHtml(ob, profiles = [], isAdmin = false) {
           ${opcoes}
         </select>
         <small class="hint">
-          Toda tarefa passa por validação. Membros não podem validar o próprio
+          Ative esta opção somente quando houver validação formal. Membros não podem validar o próprio
           trabalho; administradores concluem diretamente as atividades que executam.
         </small>
       </div>
