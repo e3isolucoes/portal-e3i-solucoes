@@ -19,7 +19,15 @@ Ela consolida três áreas:
 2. **Parâmetros** — mantém um registro central, por organização, para parâmetros governados do E3I Intelligence;
 3. **Governança** — apresenta os guardrails de tenant, allowlist, concorrência e o histórico recente de mudanças.
 
-A tela clássica continua disponível em `/admin-ferramentas.html` como fallback operacional. Nenhum contrato existente foi removido.
+`/admin-ferramentas.html` foi aposentada como interface operacional e redireciona para `/admin-central.html`. A Central é a única experiência administrativa exposta.
+
+## Autoridade administrativa
+
+O administrador-raiz é definido por `E3I_ROOT_ADMIN_EMAIL`, com padrão `admin@e3isolucoes.com.br`. Esse usuário tem acesso permanente à Administração central e é o único autorizado a conceder ou revogar o papel `E3I_ADMIN`.
+
+Administradores delegados continuam podendo operar a Central, mas não podem promover, rebaixar, suspender ou alterar outro administrador. Cada delegação registra `adminCentralGrantedBy` e `adminCentralGrantedAt`; somente concessões cuja origem é o administrador-raiz são aceitas.
+
+No início de cada revisão, `reconcile-admin-authority.cjs` reconcilia o dataset: garante o papel administrativo do raiz, preserva delegações válidas, rebaixa administradores legados sem proveniência do raiz e revoga sessões afetadas. A página `/admin-central.html` não fica mais no diretório público do frontend; o backend a entrega somente após validar a sessão e a autorização. O Portal consulta `GET /api/admin/access` para exibir o link **Administração** somente a usuários autorizados.
 
 ## Segurança e contrato de ferramentas
 
