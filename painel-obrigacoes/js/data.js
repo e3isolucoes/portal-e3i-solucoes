@@ -12,7 +12,7 @@ import { fetchAuditLog } from './api/auditLog.js';
 import {
   fetchChecklistItems, fetchAllChecklistItems, createChecklistItem, createChecklistItemsBulk, deleteChecklistItem as apiDeleteChecklistItem,
   toggleChecklistItem, resetChecklistItems,
-} from './api/checklist.js?v=20260908-csp-wasm-v2';
+} from './api/checklist.js?v=20260917-task-actions-v1';
 import { fetchHolidays, createHoliday, deleteHoliday as apiDeleteHoliday, fetchNationalHolidays } from './api/holidays.js';
 import {
   fetchObligationRules, createObligationRule, updateObligationRule, deleteObligationRule as apiDeleteObligationRule,
