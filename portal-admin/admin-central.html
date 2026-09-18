@@ -16,7 +16,6 @@
       </a>
       <div class="topbar-actions">
         <span id="sessionBadge" class="session-badge">Sessão administrativa</span>
-        <a class="legacy-link" href="/admin-ferramentas.html">Tela clássica</a>
         <a class="back-link" href="/">← Minhas Ferramentas</a>
       </div>
     </header>
@@ -126,7 +125,7 @@
       <input id="userId" type="hidden" />
       <label class="field-stack"><span>Nome</span><input id="userName" type="text" maxlength="120" required autocomplete="name" /></label>
       <label class="field-stack"><span>E-mail</span><input id="userEmail" type="email" maxlength="254" required autocomplete="email" /></label>
-      <label class="field-stack"><span>Papel no Portal</span><select id="userRole"><option value="OPERATOR">Operador</option><option value="E3I_ADMIN">Administrador E3I</option></select><small>Privilégio administrativo permite gerir usuários, acessos e parâmetros desta organização.</small></label>
+      <label class="field-stack"><span>Papel no Portal</span><select id="userRole"><option value="OPERATOR">Operador</option><option value="E3I_ADMIN">Administrador E3I</option></select><small>Somente o administrador raiz admin@e3isolucoes.com.br pode conceder ou revogar o papel Administrador E3I.</small></label>
       <div class="notice"><strong>Primeiro acesso seguro:</strong> novos usuários não recebem senha compartilhada. O acesso é ativado pelo fluxo de código enviado ao e-mail cadastrado e criação de senha forte.</div>
       <div class="dialog-actions"><button type="button" class="btn btn-secondary" data-user-cancel>Cancelar</button><button id="userSaveButton" type="submit" class="btn btn-primary">Salvar usuário</button></div>
     </form>
