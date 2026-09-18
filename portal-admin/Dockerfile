@@ -5,7 +5,7 @@ COPY admin-ferramentas.html /app/dist/admin-ferramentas.html
 COPY admin-ferramentas.css /app/dist/admin-ferramentas.css
 COPY admin-ferramentas.js /app/dist/admin-ferramentas.js
 
-COPY admin-central.html /app/dist/admin-central.html
+COPY admin-central.html /app/private/admin-central.html
 COPY admin-central.css /app/dist/admin-central.css
 COPY admin-central.js /app/dist/admin-central.js
 COPY e3i-logo.svg /app/dist/e3i-logo.svg
@@ -15,6 +15,8 @@ COPY test-admin-central.cjs /tmp/test-admin-central.cjs
 COPY admin-users-server-snippet.txt /tmp/admin-users-server-snippet.txt
 COPY patch-admin-users.cjs /tmp/patch-admin-users.cjs
 COPY test-admin-users.cjs /tmp/test-admin-users.cjs
+COPY reconcile-admin-authority.cjs /app/reconcile-admin-authority.cjs
+COPY test-admin-authority.cjs /tmp/test-admin-authority.cjs
 COPY brand-assets-server-snippet.txt /tmp/brand-assets-server-snippet.txt
 COPY patch-brand-assets.cjs /tmp/patch-brand-assets.cjs
 COPY test-brand-assets.cjs /tmp/test-brand-assets.cjs
@@ -32,18 +34,20 @@ RUN node /tmp/patch-first-login.cjs \
  && node /tmp/patch-brand-assets.cjs \
  && node --check /app/dist/server.cjs \
  && node --check /app/dist/admin-central.js \
+ && node --check /app/reconcile-admin-authority.cjs \
  && node --check /app/dist/admin-ferramentas.js \
  && node --check /app/dist/client-tool-auth.js \
  && node --check /app/dist/first-login.js \
  && node --check /app/migrate-gra-users.cjs \
- && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_PATCH_SCRIPT=/tmp/patch-admin-central.cjs E3I_ADMIN_SNIPPET=/tmp/admin-central-server-snippet.txt node /tmp/test-admin-central.cjs \
+ && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_HTML=/app/private/admin-central.html E3I_ADMIN_PATCH_SCRIPT=/tmp/patch-admin-central.cjs E3I_ADMIN_SNIPPET=/tmp/admin-central-server-snippet.txt node /tmp/test-admin-central.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_USERS_PATCH_SCRIPT=/tmp/patch-admin-users.cjs E3I_ADMIN_USERS_SNIPPET=/tmp/admin-users-server-snippet.txt node /tmp/test-admin-users.cjs \
+ && E3I_ADMIN_AUTHORITY_SCRIPT=/app/reconcile-admin-authority.cjs node /tmp/test-admin-authority.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_BRAND_PATCH_SCRIPT=/tmp/patch-brand-assets.cjs E3I_ADMIN_BRAND_SNIPPET=/tmp/brand-assets-server-snippet.txt E3I_ADMIN_BRAND_LOGO_FILE=/app/dist/e3i-logo.svg node /tmp/test-brand-assets.cjs \
  && test -s /app/dist/e3i-logo.svg \
  && test -s /app/dist/admin-ferramentas.html \
  && test -s /app/dist/admin-ferramentas.css \
  && test -s /app/dist/admin-ferramentas.js \
- && test -s /app/dist/admin-central.html \
+ && test -s /app/private/admin-central.html \
  && test -s /app/dist/admin-central.css \
  && test -s /app/dist/admin-central.js \
  && test -s /app/dist/client-tool-auth.js \
@@ -51,20 +55,24 @@ RUN node /tmp/patch-first-login.cjs \
  && test -s /app/dist/first-login.css \
  && grep -Fq '/api/client-tools' /app/dist/admin-ferramentas.js \
  && grep -Fq '/api/admin/organizations/' /app/dist/admin-ferramentas.js \
- && grep -Fq 'admin-ferramentas.js' /app/dist/admin-ferramentas.html \
+ && grep -Fq '/admin-central.html' /app/dist/admin-ferramentas.html \
  && grep -Fq '/api/client-tools' /app/dist/admin-central.js \
  && grep -Fq '/users' /app/dist/admin-central.js \
  && grep -Fq 'force-first-login' /app/dist/admin-central.js \
  && grep -Fq 'central-settings' /app/dist/admin-central.js \
  && grep -Fq 'x-e3i-admin-request' /app/dist/admin-central.js \
- && grep -Fq '/e3i-logo.svg' /app/dist/admin-central.html \
- && grep -Fq 'admin-central.js' /app/dist/admin-central.html \
+ && grep -Fq '/e3i-logo.svg' /app/private/admin-central.html \
+ && grep -Fq 'admin-central.js' /app/private/admin-central.html \
+ && ! grep -Fq 'admin-ferramentas.html' /app/private/admin-central.html \
  && grep -Fq 'E3I_ADMIN_CENTRAL_PATCH_V1' /app/dist/server.cjs \
  && grep -Fq 'E3I_ADMIN_USERS_PATCH_V1' /app/dist/server.cjs \
  && grep -Fq 'E3I_ADMIN_BRAND_ASSETS_PATCH_V1' /app/dist/server.cjs \
  && grep -Fq "app.get('/e3i-logo.svg'" /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/users' /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/central-settings' /app/dist/server.cjs \
+ && grep -Fq "app.get('/api/admin/access'" /app/dist/server.cjs \
+ && grep -Fq "app.get('/admin-central.html'" /app/dist/server.cjs \
+ && grep -Fq 'admin@e3isolucoes.com.br' /app/dist/server.cjs \
  && grep -Fq 'SELF_REVOKE_BLOCKED' /app/dist/server.cjs \
  && grep -Fq 'LAST_ADMIN_PROTECTED' /app/dist/server.cjs \
  && grep -Fq 'E3I_CLIENT_TOOL_AUTH_BRIDGE_V1' /app/dist/client-tool-auth.js \
@@ -84,7 +92,7 @@ RUN node /tmp/patch-first-login.cjs \
  && echo 'PORTAL_CLIENT_TOOL_AUTH_VALIDATION_OK' \
  && echo 'PORTAL_FIRST_LOGIN_TRANSPORT_VALIDATION_OK'
 
-CMD ["sh", "-c", "node /app/migrate-gra-users.cjs && exec node /app/dist/server.cjs"]
+CMD ["sh", "-c", "node /app/migrate-gra-users.cjs && node /app/reconcile-admin-authority.cjs && exec node /app/dist/server.cjs"]
 
-LABEL e3i.portal.feature="tool-access-admin,central-admin-v2,user-lifecycle,brand-theme,central-admin-settings,first-login-password,first-login-transport,client-tool-auth-bridge" \
+LABEL e3i.portal.feature="tool-access-admin,central-admin-v2,root-admin-delegation,user-lifecycle,brand-theme,central-admin-settings,first-login-password,first-login-transport,client-tool-auth-bridge" \
       e3i.portal.base-digest="sha256:04d63f77dbd8fef806a9b19601909b10901f2e8f0a4558df22a93bdeed4b3fb1"
