@@ -40,7 +40,7 @@ export class Repository {
   async create(auth, entity, input) {
     const config = entityConfig(entity);
     requireModuleGrant(auth, config.writeGrant || config.grant);
-    requireRole(auth, config.write);
+    requireRole(auth, config.create || config.write);
     const validated = validateCreate(entity, input);
     this.requireSafeProfileRoleChange(auth, null, validated, true);
     if (entity === 'completions' && validated.done_by && validated.done_by !== auth.userId) {
@@ -176,7 +176,7 @@ export class Repository {
   async completionCreateDefaults(auth, validated, timestamp) {
     const obligation = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: { PK: tenantPk(auth.workspaceId), SK: entitySk('obligations', validated.obligation_id) }, ConsistentRead: true }))).Item;
     if (!obligation) throw Object.assign(new Error('Referência inválida: obligation_id.'), { statusCode: 400 });
-    const requiresValidation = obligation.requires_validation !== false && !['admin', 'super_admin'].includes(auth.role);
+    const requiresValidation = obligation.requires_validation === true && !['admin', 'super_admin'].includes(auth.role);
     if (requiresValidation && !obligation.validator_id) throw Object.assign(new Error('A Gestão ainda não definiu o validador desta tarefa.'), { statusCode: 400 });
     if (requiresValidation && obligation.validator_id === auth.userId) throw Object.assign(new Error('O executor não pode validar o próprio trabalho.'), { statusCode: 400 });
     return {
