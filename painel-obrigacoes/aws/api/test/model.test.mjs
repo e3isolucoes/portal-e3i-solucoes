@@ -26,6 +26,12 @@ test('membro autenticado pode criar obrigação no próprio workspace', () => {
   assert.ok(entityConfig('obligations').read.includes('member'));
 });
 
+test('membro pode criar empresa operacional sem ganhar poder de alterar cadastro mestre', () => {
+  const companies = entityConfig('companies');
+  assert.ok(companies.create.includes('member'));
+  assert.equal(companies.write.includes('member'), false);
+});
+
 test('entidades declaram a fronteira modular aplicada pelo backend', () => {
   assert.equal(entityConfig('obligations').grant, 'obrigacoes');
   assert.equal(entityConfig('audit_log').grant, 'administracao');

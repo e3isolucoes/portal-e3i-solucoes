@@ -33,5 +33,8 @@ export function adaptRecordForRead(record) {
   if (record.entityType === 'completions' && canonicalCompletionStatus(record.status)) {
     return { ...record, status: canonicalCompletionStatus(record.status) };
   }
+  if (record.entityType === 'checklist_items' && record.completed === undefined && typeof record.done === 'boolean') {
+    return { ...record, completed: record.done };
+  }
   return record;
 }

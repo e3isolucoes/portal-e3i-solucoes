@@ -34,7 +34,7 @@ export async function fetchAllChecklistItems() {
 // concluído" na obrigação inteira), sem precisar de permissão de admin
 // para editar a tabela inteira (isso protegeria só descrição/posição).
 export async function toggleChecklistItem(itemId, done) {
-  if (isAwsDataBackend()) return awsData.update('checklist_items', itemId, { done, completed_at: done ? new Date().toISOString() : null });
+  if (isAwsDataBackend()) return awsData.update('checklist_items', itemId, { completed: done, completed_at: done ? new Date().toISOString() : null });
   const { data, error } = await supabase.rpc('set_checklist_item_done', { p_item_id: itemId, p_done: done });
   if (error) throw error;
   return data;
@@ -47,8 +47,8 @@ export async function toggleChecklistItem(itemId, done) {
 // qualquer pessoa autenticada pode concluir uma obrigação, não só admin.
 export async function resetChecklistItems(obligationId) {
   if (isAwsDataBackend()) {
-    const items = (await awsData.list('checklist_items')).filter((item) => item.obligation_id === obligationId && item.done);
-    return Promise.all(items.map((item) => awsData.update('checklist_items', item.id, { done: false, completed_at: null })));
+    const items = (await awsData.list('checklist_items')).filter((item) => item.obligation_id === obligationId && (item.completed || item.done));
+    return Promise.all(items.map((item) => awsData.update('checklist_items', item.id, { completed: false, done: false, completed_at: null })));
   }
   const { data, error } = await supabase.rpc('reset_checklist_items', { p_obligation_id: obligationId });
   if (error) throw error;

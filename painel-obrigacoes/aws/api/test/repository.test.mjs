@@ -144,6 +144,48 @@ test('atualização faz rollback atômico quando o lock antigo não pertence à 
   assert.equal([...client.state.values()].some(item => item.entityType === 'audit_log'), false);
 });
 
+
+test('obrigação legada sem flag explícita de validação pode ser concluída por membro', async () => {
+  const client = transactionalClient([obligation()]);
+  const created = await new Repository(client, 'table').create(auth, 'completions', {
+    obligation_id: 'obligation-a',
+    occurrence_date: '2026-09-17',
+    done_by_name: 'Usuário'
+  });
+  assert.equal(created.status, 'validada');
+  assert.equal(created.done_by, auth.userId);
+  assert.equal(created.validator_id, null);
+});
+
+test('validação continua obrigatória quando foi explicitamente configurada', async () => {
+  const client = transactionalClient([obligation('obligation-a', tenantKey), {
+    PK: tenantKey,
+    SK: 'OBLIGATION#obligation-a',
+    id: 'obligation-a',
+    entityType: 'obligations',
+    requires_validation: true
+  }]);
+  await assert.rejects(
+    new Repository(client, 'table').create(auth, 'completions', {
+      obligation_id: 'obligation-a',
+      occurrence_date: '2026-09-17',
+      done_by_name: 'Usuário'
+    }),
+    error => error.statusCode === 400 && /validador/.test(error.message)
+  );
+});
+
+test('membro pode criar empresa pelo fluxo operacional, mas não alterar o cadastro mestre', async () => {
+  const client = transactionalClient([]);
+  const repository = new Repository(client, 'table');
+  const created = await repository.create(auth, 'companies', { name: 'Empresa Operacional' });
+  assert.equal(created.name, 'Empresa Operacional');
+  await assert.rejects(
+    repository.update(auth, 'companies', created.id, { name: 'Nome alterado', version: 1 }),
+    error => error.statusCode === 403
+  );
+});
+
 test('criação de conclusão rejeita obrigação existente somente em outro tenant', async () => {
   const otherTenant = 'TOOL#painel-obrigacoes#ENV#dev#WORKSPACE#empresa-b';
   const client = transactionalClient([obligation('obligation-b', otherTenant)]);

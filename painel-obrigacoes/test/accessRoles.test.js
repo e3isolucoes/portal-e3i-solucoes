@@ -7,6 +7,7 @@ import {
 } from '../js/state.js';
 import { renderBoard } from '../js/ui/board.js';
 import { renderToolbar } from '../js/ui/toolbar.js';
+import { validatorFieldHtml } from '../js/ui/validatorField.js';
 
 test.afterEach(() => {
   STATE.profile = null;
@@ -23,6 +24,16 @@ test('gestor tem acesso operacional sem ser administrador de acessos', () => {
   assert.equal(canViewAllObligations(), true);
   assert.match(renderToolbar(), /data-tab="manage"/);
   assert.doesNotMatch(renderToolbar(), /data-tab="mine"/);
+});
+
+test('validação de atividade é opt-in e não bloqueia registro legado', () => {
+  const legacyMemberHtml = validatorFieldHtml({ id: 'ob-legada' }, [], false);
+  assert.match(legacyMemberHtml, /id="fRequiresValidation"/);
+  assert.doesNotMatch(legacyMemberHtml, /id="fRequiresValidation"[^>]*checked/);
+
+  const managerHtml = validatorFieldHtml({ id: 'ob-nova', requires_validation: false }, [], true);
+  assert.match(managerHtml, /id="fRequiresValidation"/);
+  assert.doesNotMatch(managerHtml, /id="fRequiresValidation"[^>]*disabled/);
 });
 
 test('gestor visualiza toda a carteira mesmo ao chegar pelo antigo recorte pessoal', () => {
@@ -58,17 +69,28 @@ test('membro ativo pode incluir, editar e excluir atividades/obrigações', asyn
   assert.match(renderBoard({ onlyMine: true }), /data-action="edit" data-id="ob-1"/);
   assert.doesNotMatch(renderToolbar(), /data-tab="manage"/);
 
-  const [renderSource, modalSource, validatorSource, modelSource] = await Promise.all([
+  const [renderSource, modalSource, validatorSource, modelSource, dataSource, checklistSource, contractSource] = await Promise.all([
     readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/ui/modal.js', import.meta.url), 'utf8'),
     readFile(new URL('../js/ui/validatorField.js', import.meta.url), 'utf8'),
     readFile(new URL('../aws/api/src/model.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../js/data.js', import.meta.url), 'utf8'),
+    readFile(new URL('../js/api/checklist.js', import.meta.url), 'utf8'),
+    readFile(new URL('../aws/api/src/contract.mjs', import.meta.url), 'utf8'),
   ]);
   assert.match(renderSource, /action === 'edit'[\s\S]*?canWriteObligations\(\)/);
   assert.match(renderSource, /action === 'delete'[\s\S]*?canWriteObligations\(\)/);
   assert.match(modalSource, /data-action="delete-in-modal"/);
   assert.match(validatorSource, /fRequiresValidation[\s\S]*?fValidator[\s\S]*?hidden/);
   assert.match(modelSource, /obligations:[\s\S]*?write: \['member', 'manager', 'admin', 'super_admin'\]/);
+  assert.match(modelSource, /companies:[\s\S]*?create: \['member', 'manager', 'admin', 'super_admin'\]/);
+  assert.match(modalSource, /requires_validation: false/);
+  assert.match(modalSource, /requires_validation: ob\.requires_validation === true/);
+  assert.match(validatorSource, /requires_validation === true/);
+  assert.doesNotMatch(validatorSource, /requires_validation !== false/);
+  assert.match(dataSource, /requires_validation: formData\.requires_validation === true/);
+  assert.match(checklistSource, /completed: done/);
+  assert.match(contractSource, /entityType === 'checklist_items'[\s\S]*?completed: record\.done/);
 });
 
 test('módulos administrativos não reutilizam categorias de obrigação acessória', async () => {
