@@ -180,6 +180,49 @@ test('validação continua obrigatória quando foi explicitamente configurada', 
   );
 });
 
+test('nova conclusão congela competência e estrutura da obrigação', async () => {
+  const currentObligation = {
+    ...obligation(),
+    ...frontendPayloads.obligation,
+    competence_offset_months: 1,
+    version: 4,
+  };
+  const client = transactionalClient([currentObligation]);
+
+  const created = await new Repository(client, 'table').create(auth, 'completions', {
+    obligation_id: currentObligation.id,
+    occurrence_date: '2026-09-20',
+    done_by_name: 'Usuário',
+  });
+
+  assert.equal(created.competence_date, '2026-08-01');
+  assert.equal(created.obligation_snapshot.name, currentObligation.name);
+  assert.equal(created.obligation_snapshot.competence_offset_months, 1);
+  assert.equal(created.obligation_snapshot.source_version, 4);
+});
+
+test('alteração estrutural preserva uma versão anterior da obrigação', async () => {
+  const current = {
+    ...obligation(),
+    ...frontendPayloads.obligation,
+    competence_offset_months: 1,
+    version: 3,
+  };
+  const client = transactionalClient([current]);
+  const adminAuth = { ...auth, role: 'admin' };
+
+  const updated = await new Repository(client, 'table').update(adminAuth, 'obligations', current.id, {
+    competence_offset_months: 0,
+    version: 3,
+  });
+
+  assert.equal(updated.competence_offset_months, 0);
+  assert.equal(updated.structure_history.length, 1);
+  assert.equal(updated.structure_history[0].snapshot.competence_offset_months, 1);
+  assert.equal(updated.structure_history[0].snapshot.name, current.name);
+  assert.ok(updated.structure_history[0].effective_until);
+});
+
 test('admin pode salvar obrigação legada sem version e registro passa a ser versionado', async () => {
   const current = {
     ...obligation(),
