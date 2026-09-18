@@ -185,6 +185,8 @@ test('nova conclusão congela competência e estrutura da obrigação', async ()
     ...obligation(),
     ...frontendPayloads.obligation,
     competence_offset_months: 1,
+    requires_validation: false,
+    validator_id: null,
     version: 4,
   };
   const client = transactionalClient([currentObligation]);
