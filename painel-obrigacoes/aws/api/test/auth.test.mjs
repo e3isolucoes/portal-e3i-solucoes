@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { authConfigurations, normalizeSupabaseIssuer, requireModuleGrant } from '../src/auth.mjs';
+import { canonicalRole } from '../src/contract.mjs';
 
 test('normaliza o emissor Supabase sem duplicar /auth/v1', () => {
   assert.equal(normalizeSupabaseIssuer('https://project.supabase.co/auth/v1'), 'https://project.supabase.co/auth/v1');
@@ -18,6 +19,13 @@ test('aceita somente os emissores Cognito e Supabase explicitamente configurados
     { issuer: 'https://cognito.example/pool', audience: 'client-id' },
     { issuer: 'https://project.supabase.co/auth/v1', audience: 'authenticated' },
   ]);
+});
+
+test('normaliza gestor independentemente de caixa e idioma canônico', () => {
+  assert.equal(canonicalRole('gestor'), 'manager');
+  assert.equal(canonicalRole('Gestor'), 'manager');
+  assert.equal(canonicalRole('GESTOR'), 'manager');
+  assert.equal(canonicalRole('manager'), 'manager');
 });
 
 test('obrigações são capacidade operacional básica e demais módulos continuam protegidos', () => {
