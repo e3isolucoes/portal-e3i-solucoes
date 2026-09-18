@@ -15,7 +15,7 @@ export const CANONICAL_ROLES = Object.freeze(['member', 'manager', 'admin', 'sup
 export const CANONICAL_COMPLETION_STATUSES = Object.freeze(['aguardando_validacao', 'validada', 'rejeitada']);
 
 export function canonicalRole(value) {
-  return typeof value === 'string' ? ROLE_ALIASES[value.trim()] : undefined;
+  return typeof value === 'string' ? ROLE_ALIASES[value.trim().toLowerCase()] : undefined;
 }
 
 export function canonicalCompletionStatus(value) {
