@@ -93,7 +93,22 @@ export class Repository {
     if (!legacyWithoutVersion && expectedVersion !== Number(current.version)) {
       throw Object.assign(new Error('O registro foi alterado por outro usuário. Atualize e tente novamente.'), { statusCode: 409 });
     }
-    const item = { ...current, ...lifecyclePatch, version: expectedVersion + 1, updated_at: now() };
+    const timestamp = now();
+    let structureHistory = current.structure_history;
+    if (entity === 'obligations' && obligationStructureChanged(current, lifecyclePatch)) {
+      const snapshot = await this.obligationSnapshot(auth, current);
+      structureHistory = [
+        ...(Array.isArray(current.structure_history) ? current.structure_history : []),
+        { effective_until: timestamp, snapshot }
+      ];
+    }
+    const item = {
+      ...current,
+      ...lifecyclePatch,
+      ...(structureHistory ? { structure_history: structureHistory } : {}),
+      version: expectedVersion + 1,
+      updated_at: timestamp
+    };
     const occurrenceChanged = entity === 'completions'
       && (item.obligation_id !== current.obligation_id || item.occurrence_date !== current.occurrence_date);
     const lockChanges = occurrenceChanged
@@ -155,6 +170,19 @@ export class Repository {
     return { PK: tenantPk(auth.workspaceId), SK: `AUDIT#${timestamp}#${id}`, id, entityType: 'audit_log', toolId: TOOL_ID, environment: APP_ENV, workspace_id: auth.workspaceId, action, table_name: entity, record_id: entityId, actor_id: auth.userId, actor_email: auth.email, old_data: before, new_data: after, created_at: timestamp, schemaVersion: SCHEMA_VERSION };
   }
 
+  async obligationSnapshot(auth, obligation) {
+    let companyName = '';
+    if (obligation?.company_id) {
+      const company = (await this.client.send(new GetCommand({
+        TableName: this.tableName,
+        Key: { PK: tenantPk(auth.workspaceId), SK: entitySk('companies', obligation.company_id) },
+        ConsistentRead: true
+      }))).Item;
+      companyName = String(company?.name || '');
+    }
+    return obligationSnapshot(obligation, companyName);
+  }
+
   async requireRelationships(auth, entity, record) {
     for (const [field, targetEntity] of Object.entries(entityRelationships[entity] || {})) {
       const value = record[field];
@@ -199,10 +227,13 @@ export class Repository {
     const requiresValidation = obligation.requires_validation === true && !['admin', 'super_admin'].includes(auth.role);
     if (requiresValidation && !obligation.validator_id) throw Object.assign(new Error('A Gestão ainda não definiu o validador desta tarefa.'), { statusCode: 400 });
     if (requiresValidation && obligation.validator_id === auth.userId) throw Object.assign(new Error('O executor não pode validar o próprio trabalho.'), { statusCode: 400 });
+    const snapshot = await this.obligationSnapshot(auth, obligation);
     return {
       done_at: validated.done_at || timestamp, done_by: auth.userId,
       status: requiresValidation ? 'aguardando_validacao' : 'validada',
       validator_id: obligation.validator_id || null, submitted_at: validated.submitted_at || timestamp,
+      competence_date: competenceDateForOccurrence(obligation, validated.occurrence_date),
+      obligation_snapshot: snapshot,
       ...(requiresValidation ? {} : { validated_at: timestamp, validated_by: auth.userId })
     };
   }
@@ -232,6 +263,38 @@ export class Repository {
     if (!creating && patch.done_by !== undefined) forbidden.push('done_by');
     if (forbidden.length) throw Object.assign(new Error(`Campo controlado pelo servidor: ${forbidden[0]}.`), { statusCode: 403 });
   }
+}
+
+const OBLIGATION_STRUCTURE_FIELDS = Object.freeze([
+  'name', 'category', 'company_id', 'responsible', 'responsible_id', 'frequency',
+  'day_of_month', 'month', 'months', 'due_date', 'competence_offset_months', 'notes',
+  'activity_type', 'process_name', 'area_name', 'predecessor_id', 'module_key',
+  'requires_attachment', 'requires_attachment_no_movement', 'priority',
+  'adjust_business_day', 'day_type', 'business_day_shift', 'requires_validation', 'validator_id'
+]);
+
+function sameValue(left, right) {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+function obligationStructureChanged(current, patch) {
+  return OBLIGATION_STRUCTURE_FIELDS.some((field) => field in patch && !sameValue(current?.[field], patch[field]));
+}
+
+function obligationSnapshot(obligation, companyName = '') {
+  const snapshot = {};
+  for (const field of OBLIGATION_STRUCTURE_FIELDS) snapshot[field] = obligation?.[field] ?? null;
+  snapshot.company_name = companyName || '';
+  snapshot.source_version = Number.isInteger(obligation?.version) ? obligation.version : null;
+  return snapshot;
+}
+
+function competenceDateForOccurrence(obligation, occurrenceDate) {
+  const match = /^(\d{4})-(\d{2})/.exec(String(occurrenceDate || ''));
+  if (!match) return null;
+  const offset = Math.max(0, Math.min(36, Number(obligation?.competence_offset_months || 0)));
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1 - offset, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
 
 function encodeCursor(key) {
