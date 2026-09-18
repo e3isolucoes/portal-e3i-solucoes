@@ -2,7 +2,7 @@ const fs = require('fs');
 
 const SERVER = process.env.E3I_PORTAL_SERVER || '/app/dist/server.cjs';
 const SNIPPET = process.env.E3I_ADMIN_BRAND_SNIPPET || '/tmp/brand-assets-server-snippet.txt';
-const MARKER = 'E3I_ADMIN_BRAND_ASSETS_PATCH_V1';
+const MARKER = 'E3I_ADMIN_BRAND_ASSETS_PATCH_V2';
 const LOGIN_MARKER = 'app.post("/api/auth/login", async (req, res) => {';
 
 function replaceOnce(source, needle, replacement, label) {
