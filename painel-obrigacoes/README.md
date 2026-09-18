@@ -82,12 +82,10 @@ painel-obrigacoes/
 │       ├── completeDialog.js  diálogo de conclusão: checklist + comprovante obrigatórios
 │       ├── toast.js           notificações não-bloqueantes (substitui alert())
 │       └── confirmDialog.js   diálogo de confirmação (substitui confirm())
-├── scripts/
-│   ├── enviar-alertas.mjs    aviso local do cutover para Lambda
-│   └── enviar-alertas-legacy-supabase.mjs  rollback manual, não agendado
+├── scripts/                  utilitários de governança, configuração e lógica compartilhada
 ├── .github/workflows/
-│   ├── azure-static-web-apps.yml  deploy do site e da API na Azure
-│   └── alertas-diarios.yml   execução manual do script de alertas
+│   ├── azure-static-web-apps.yml  validação e deploy do site/API Azure
+│   └── aws-sam-staging.yml        validação e deploy do backend AWS
 └── sql/
     └── schema.sql            tabelas, papéis (RLS) — rode isto no Supabase
 ```
@@ -298,7 +296,7 @@ Além de editar a regra de recorrência inteira, a gerência pode prorrogar ou a
 
 - **Onde fica salvo:** tabela nova `obligation_date_overrides` (`obligation_id`, `original_date`, `override_date`, `reason`), com uma chave única em `(obligation_id, original_date)` — ou seja, um ajuste por ocorrência. `original_date` é a data bruta calculada pela regra (a mesma usada como identidade da ocorrência para fins de conclusão/histórico); `override_date` é a data efetiva mostrada na tela.
 - **O que muda visualmente:** o cartão no Painel, a lista de Gerenciar → Obrigações, a Lista de risco e o score preditivo da Visão Executiva passam a considerar a data ajustada (`displayDate`) para status/ordenação/cor, e mostram um aviso "📌 data ajustada manualmente" com a data padrão original entre parênteses.
-- **O que não muda:** a conclusão da ocorrência continua vinculada à `original_date` — o ajuste é só uma camada de exibição por cima do cálculo normal (`js/state.js`, `activeOccurrences()`), não altera `getActiveOccurrence`/`occurrencesInRange` nem o script de alertas por e-mail (`scripts/enviar-alertas.mjs`), que continuam enxergando a data bruta da regra. Isso é uma limitação conhecida: os e-mails de alerta ainda não avisam com base na data ajustada, só o painel.
+- **O que não muda:** a conclusão da ocorrência continua vinculada à `original_date`. O ajuste é uma camada de exibição sobre o cálculo normal; o serviço de notificações AWS usa a mesma lógica compartilhada de ocorrências.
 - **Remover um ajuste:** reabrir o mesmo diálogo mostra um botão "Remover ajuste" que apaga a exceção e volta a usar o vencimento padrão da regra.
 
 ## Prioridade, checklist, comentários e histórico
@@ -349,7 +347,7 @@ Dois formatos são suportados, cada um do seu jeito:
 - Outros formatos (nem imagem, nem PDF) ficam marcados como "não verificado" (`ocr_status = 'not_checked'`), não como erro.
 - Se não achar nenhuma data de competência reconhecível no texto lido (de nenhuma das duas fontes acima), também fica como "não verificado" — não impede a conclusão.
 - Se achar uma competência que **não bate** com a ocorrência (nem o mês, nem o mês anterior), a pessoa vê um aviso na hora (`ui/completeDialog.js`) e precisa marcar "Confirmo que revisei e está correto mesmo assim" para o botão "Concluir" liberar — a conclusão é sempre gravada, só fica sinalizada (`completions.ocr_status = 'mismatch'`, `completions.ocr_extracted_period` com o texto encontrado).
-- Divergências sinalizadas aparecem para o gestor em dois lugares: na Visão Executiva (seção "Divergências de comprovante") e no e-mail diário de resumo geral para administradores (`scripts/enviar-alertas.mjs`, últimas 24h).
+- Divergências sinalizadas aparecem para o gestor na Visão Executiva e no resumo diário enviado pela Lambda de notificações AWS.
 
 **Limitação honesta:** leitura de OCR de documento fiscal real (guias escaneadas, fotos de celular, diferentes órgãos com layouts diferentes) é bem menos confiável do que ler texto embutido de um PDF nativo — espere alguns segundos de análise por arquivo (mais em PDF escaneado, que passa pelas duas etapas), e trate isso como um alerta a mais para o analista revisar, não como uma auditoria automática confiável. Só lê as duas primeiras páginas do PDF. Não foi testado contra uma variedade real de guias (DARF, GPS, boletos etc.), só com texto sintético nos testes automatizados.
 
@@ -379,10 +377,7 @@ gestores mantêm os filtros de workspace/módulo, inclusive divergências OCR da
 últimas 24 horas. Métricas e logs estruturados registram apenas contagens e
 identificadores técnicos, sem e-mails ou nomes.
 
-O workflow homônimo não agenda nem envia: ele apenas executa os testes de
-equivalência Supabase/DynamoDB. O legado está em
-`scripts/enviar-alertas-legacy-supabase.mjs`, exclusivamente para rollback
-manual. Consulte `aws/README.md` para o cutover governado.
+A validação e o deploy do serviço de notificações fazem parte do pipeline AWS. Consulte `aws/README.md` para operação e observabilidade.
 
 ## Papéis de acesso (RLS)
 
@@ -530,10 +525,7 @@ credenciais de um projeto Supabase de teste (ou de desenvolvimento) e rode
   retroativa (ver a constraint `NOT VALID` na seção de comprovantes).
 - Os alertas por e-mail devem ser validados com destinatários controlados no
   SES antes de habilitar `NotificationScheduleState`; esta alteração não faz deploy.
-- Não há testes automatizados no repositório (a suíte de testes usada
-  durante o desenvolvimento foi manual, com um mock do Supabase, e não faz
-  parte da entrega). Se o projeto crescer, vale considerar algo simples
-  como Playwright.
+- O repositório possui testes automatizados de frontend, contratos de API, migração e backend AWS executados em CI.
 
 ### Modelos minuciosos de checklist Sankhya
 
