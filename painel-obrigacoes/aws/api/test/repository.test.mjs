@@ -45,8 +45,13 @@ function transactionalClient(items) {
           const stateKey = `${Item.PK}|${Item.SK}`;
           const existing = next.get(stateKey);
           if (ConditionExpression?.includes('attribute_not_exists(PK)') && existing) throw transactionCanceled();
-          if (ExpressionAttributeValues?.[':expectedVersion'] !== undefined
-            && (!existing || existing.version !== ExpressionAttributeValues[':expectedVersion'])) throw transactionCanceled();
+          if (ExpressionAttributeValues?.[':expectedVersion'] !== undefined) {
+            const expectedVersion = ExpressionAttributeValues[':expectedVersion'];
+            const acceptsMissingVersion = ConditionExpression?.includes('attribute_not_exists(#version)');
+            if (!existing
+              || (existing.version === undefined && !acceptsMissingVersion)
+              || (existing.version !== undefined && existing.version !== expectedVersion)) throw transactionCanceled();
+          }
           next.set(stateKey, structuredClone(Item));
         }
       }
@@ -173,6 +178,24 @@ test('validação continua obrigatória quando foi explicitamente configurada', 
     }),
     error => error.statusCode === 400 && /validador/.test(error.message)
   );
+});
+
+test('admin pode salvar obrigação legada sem version e registro passa a ser versionado', async () => {
+  const current = {
+    ...obligation(),
+    ...frontendPayloads.obligation,
+  };
+  delete current.version;
+  const client = transactionalClient([current]);
+  const adminAuth = { ...auth, role: 'admin' };
+
+  const updated = await new Repository(client, 'table').update(adminAuth, 'obligations', current.id, {
+    name: 'DCTFWeb migrada na primeira edição',
+  });
+
+  assert.equal(updated.name, 'DCTFWeb migrada na primeira edição');
+  assert.equal(updated.version, 2);
+  assert.equal(client.state.get(`${tenantKey}|${current.SK}`).version, 2);
 });
 
 test('admin pode editar obrigação legada com responsável não migrado sem alterar o vínculo', async () => {
