@@ -33,6 +33,10 @@
     return isSameOriginPath(value, (path) => path === '/api/client-tools' || path.startsWith('/api/client-tools/'));
   }
 
+  function isAdminAccessUrl(value) {
+    return isSameOriginPath(value, (path) => path === '/api/admin/access');
+  }
+
   function normalizeAuthorization(value) {
     const text = String(value || '').trim();
     if (!text) return '';
@@ -77,7 +81,7 @@
   }
 
   function prepareClientToolFetch(input, init) {
-    if (!isClientToolsUrl(input)) return [input, init];
+    if (!isClientToolsUrl(input) && !isAdminAccessUrl(input)) return [input, init];
 
     const nextInit = { ...(init || {}) };
     const headers = fetchHeaders(input, init);
@@ -100,22 +104,23 @@
     const sessionRequest = isSessionUrl(input);
     const loginRequest = isLoginUrl(input);
     const clientToolRequest = isClientToolsUrl(input);
+    const adminAccessRequest = isAdminAccessUrl(input);
     const [preparedInput, preparedInit] = prepareClientToolFetch(input, init);
     let response = await nativeFetch(preparedInput, preparedInit);
 
     try {
       if (sessionRequest && response.ok) {
         const payload = await response.clone().json().catch(() => ({}));
-        if (hasAuthenticatedUser(payload)) rememberSessionTransport(input, init);
+        if (hasAuthenticatedUser(payload)) { rememberSessionTransport(input, init); queueMicrotask(refreshAdminEntry); }
       } else if (loginRequest && response.ok) {
         const payload = await response.clone().json().catch(() => ({}));
-        rememberLoginToken(payload);
+        rememberLoginToken(payload); queueMicrotask(refreshAdminEntry);
       }
 
       // Defensive fallback: if a valid bearer captured from the active session was
       // rejected, retry this same-origin client-tool request once using the session
       // cookie. This handles stale-token precedence without weakening validation.
-      if (clientToolRequest && response.status === 401 && activeAuthorization) {
+      if ((clientToolRequest || adminAccessRequest) && response.status === 401 && activeAuthorization) {
         const retryInit = { ...(init || {}) };
         const retryHeaders = fetchHeaders(input, init);
         retryHeaders.delete('Authorization');
@@ -134,6 +139,46 @@
 
     return response;
   };
+
+  function ensureAdminEntryStyles() {
+    if (document.getElementById('e3i-admin-entry-style')) return;
+    const style = document.createElement('style');
+    style.id = 'e3i-admin-entry-style';
+    style.textContent = '#e3i-admin-entry{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:38px;padding:.55rem .85rem;border:1px solid rgba(23,57,92,.24);border-radius:8px;text-decoration:none;font:700 13px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17395C;background:#fff;box-shadow:0 1px 2px rgba(14,26,41,.06)}#e3i-admin-entry:hover{border-color:#8F6A11;color:#8F6A11}#e3i-admin-entry.e3i-admin-entry-floating{position:fixed;right:20px;bottom:20px;z-index:9999}';
+    document.head.append(style);
+  }
+
+  function removeAdminEntry() {
+    document.getElementById('e3i-admin-entry')?.remove();
+  }
+
+  function renderAdminEntry() {
+    if (document.getElementById('e3i-admin-entry')) return;
+    ensureAdminEntryStyles();
+    const link = document.createElement('a');
+    link.id = 'e3i-admin-entry';
+    link.href = '/admin-central.html';
+    link.textContent = 'Administração';
+    link.setAttribute('aria-label', 'Abrir Administração central');
+    const host = document.querySelector('[data-user-actions], .user-actions, .header-actions, .topbar-actions, header nav, nav, header');
+    if (host) host.append(link);
+    else { link.classList.add('e3i-admin-entry-floating'); document.body.append(link); }
+  }
+
+  async function refreshAdminEntry() {
+    try {
+      const response = await window.fetch('/api/admin/access', { credentials: 'same-origin', headers: { accept: 'application/json' } });
+      if (!response.ok) { removeAdminEntry(); return; }
+      const payload = await response.json().catch(() => ({}));
+      if (payload?.authorized === true) renderAdminEntry();
+      else removeAdminEntry();
+    } catch {
+      removeAdminEntry();
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', refreshAdminEntry, { once: true });
+  else queueMicrotask(refreshAdminEntry);
 
   if (Xhr && !Xhr.prototype.__e3iClientToolAuthPatched) {
     const nativeOpen = Xhr.prototype.open;
