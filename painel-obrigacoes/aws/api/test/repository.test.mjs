@@ -175,6 +175,48 @@ test('validação continua obrigatória quando foi explicitamente configurada', 
   );
 });
 
+test('admin pode editar obrigação legada com responsável não migrado sem alterar o vínculo', async () => {
+  const legacyResponsibleId = 'legacy-user-not-migrated';
+  const current = {
+    ...obligation(),
+    ...frontendPayloads.obligation,
+    responsible_id: legacyResponsibleId,
+    version: 1,
+  };
+  const client = transactionalClient([current]);
+  const adminAuth = { ...auth, role: 'admin' };
+
+  const updated = await new Repository(client, 'table').update(adminAuth, 'obligations', current.id, {
+    ...frontendPayloads.obligation,
+    responsible_id: legacyResponsibleId,
+    name: 'DCTFWeb ajustada pelo admin',
+    version: 1,
+  });
+
+  assert.equal(updated.name, 'DCTFWeb ajustada pelo admin');
+  assert.equal(updated.responsible_id, legacyResponsibleId);
+  assert.equal(updated.version, 2);
+});
+
+test('admin continua impedido de apontar obrigação para relação inexistente nova', async () => {
+  const current = {
+    ...obligation(),
+    ...frontendPayloads.obligation,
+    responsible_id: null,
+    version: 1,
+  };
+  const client = transactionalClient([current]);
+  const adminAuth = { ...auth, role: 'admin' };
+
+  await assert.rejects(
+    new Repository(client, 'table').update(adminAuth, 'obligations', current.id, {
+      responsible_id: 'missing-user',
+      version: 1,
+    }),
+    error => error.statusCode === 400 && error.message === 'Referência inválida: responsible_id.'
+  );
+});
+
 test('gestor pode salvar alteração de atividade no próprio workspace', async () => {
   const current = {
     ...obligation(),
