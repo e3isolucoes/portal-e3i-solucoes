@@ -2,6 +2,8 @@
   const nativeFetch = window.fetch.bind(window);
   let currentEmail = '';
   let modal = null;
+  let returnFocus = null;
+  let completingPasswordChange = false;
 
   function getRequestUrl(request) {
     if (typeof request === 'string') return request;
@@ -81,6 +83,31 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  function clearFirstLoginFields(wrapper = modal) {
+    if (!wrapper) return;
+    const code = wrapper.querySelector('[data-e3i-code]');
+    const password = wrapper.querySelector('[data-e3i-password]');
+    const confirm = wrapper.querySelector('[data-e3i-confirm]');
+    const error = wrapper.querySelector('[data-e3i-error]');
+    if (code) code.value = '';
+    if (password) password.value = '';
+    if (confirm) confirm.value = '';
+    if (error) error.textContent = '';
+  }
+
+  function closeFirstLogin({ restoreFocus = true } = {}) {
+    if (!modal || completingPasswordChange) return false;
+    clearFirstLoginFields(modal);
+    modal.hidden = true;
+    currentEmail = '';
+    const target = returnFocus;
+    returnFocus = null;
+    if (restoreFocus && target?.isConnected && typeof target.focus === 'function') {
+      setTimeout(() => target.focus(), 0);
+    }
+    return true;
+  }
+
   function ensureModal() {
     if (modal) return modal;
     const wrapper = document.createElement('div');
@@ -111,7 +138,10 @@
           <div class="e3i-first-login-error" data-e3i-error role="alert"></div>
           <div class="e3i-first-login-actions">
             <button type="button" class="e3i-link-button" data-e3i-resend>Reenviar código</button>
-            <button type="submit" class="e3i-primary-button">Salvar nova senha</button>
+            <div class="e3i-first-login-primary-actions">
+              <button type="button" class="e3i-secondary-button" data-e3i-cancel>Cancelar</button>
+              <button type="submit" class="e3i-primary-button">Salvar nova senha</button>
+            </div>
           </div>
         </form>
       </section>`;
@@ -120,6 +150,7 @@
 
     const form = wrapper.querySelector('[data-e3i-first-login-form]');
     const resend = wrapper.querySelector('[data-e3i-resend]');
+    const cancel = wrapper.querySelector('[data-e3i-cancel]');
     const errorBox = wrapper.querySelector('[data-e3i-error]');
 
     form.addEventListener('submit', async (event) => {
@@ -134,7 +165,9 @@
       }
 
       const submit = form.querySelector('button[type="submit"]');
+      completingPasswordChange = true;
       submit.disabled = true;
+      cancel.disabled = true;
       try {
         const response = await nativeFetch('/api/auth/first-login/complete', {
           method: 'POST',
@@ -146,7 +179,8 @@
           errorBox.textContent = payload.error || 'Não foi possível alterar a senha.';
           return;
         }
-        wrapper.hidden = true;
+        completingPasswordChange = false;
+        closeFirstLogin({ restoreFocus: false });
         window.alert('Senha atualizada com sucesso. Entre novamente usando a nova senha.');
         const passwordInput = document.querySelector('input[type="password"]');
         if (passwordInput) {
@@ -156,8 +190,22 @@
       } catch {
         errorBox.textContent = 'Falha de comunicação. Tente novamente.';
       } finally {
+        completingPasswordChange = false;
         submit.disabled = false;
+        cancel.disabled = false;
       }
+    });
+
+    cancel.addEventListener('click', () => closeFirstLogin());
+
+    wrapper.addEventListener('click', (event) => {
+      if (event.target === wrapper) closeFirstLogin();
+    });
+
+    wrapper.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeFirstLogin();
     });
 
     resend.addEventListener('click', async () => {
@@ -183,11 +231,9 @@
   function openFirstLogin(email) {
     currentEmail = String(email || '').trim().toLowerCase();
     const wrapper = ensureModal();
+    if (wrapper.hidden) returnFocus = document.activeElement;
     wrapper.querySelector('[data-e3i-first-login-email]').textContent = currentEmail;
-    wrapper.querySelector('[data-e3i-code]').value = '';
-    wrapper.querySelector('[data-e3i-password]').value = '';
-    wrapper.querySelector('[data-e3i-confirm]').value = '';
-    wrapper.querySelector('[data-e3i-error]').textContent = '';
+    clearFirstLoginFields(wrapper);
     wrapper.hidden = false;
     setTimeout(() => wrapper.querySelector('[data-e3i-code]').focus(), 0);
   }
