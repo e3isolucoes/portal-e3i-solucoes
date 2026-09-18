@@ -4,66 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>E3I Soluções — Acessos às ferramentas</title>
-  <link rel="stylesheet" href="/admin-ferramentas.css" />
+  <title>E3I Soluções — Administração</title>
+  <meta http-equiv="refresh" content="0;url=/admin-central.html" />
+  <link rel="canonical" href="/admin-central.html" />
 </head>
 <body>
-  <main class="page-shell">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Voltar ao Portal E3I">
-        <img class="brand-logo" src="/e3i-logo.svg" alt="E3I Soluções" />
-        <span class="brand-copy"><strong>Administração do Portal</strong><small>Governança de acessos às ferramentas</small></span>
-      </a>
-      <a class="back-link" href="/">← Voltar ao portal</a>
-    </header>
-
-    <section class="hero" aria-labelledby="page-title">
-      <div>
-        <span class="eyebrow">GOVERNANÇA DE ACESSOS</span>
-        <h1 id="page-title">Acessos às ferramentas</h1>
-        <p>Libere ou revogue, para a organização ativa, o acesso às ferramentas já cadastradas no Portal E3I.</p>
-      </div>
-      <div class="organization-card" aria-live="polite">
-        <span>Organização ativa</span>
-        <strong id="organizationId">Carregando…</strong>
-      </div>
-    </section>
-
-    <section class="metrics" aria-label="Resumo dos acessos">
-      <article><span>Ferramentas</span><strong id="metricTotal">—</strong></article>
-      <article><span>Liberadas</span><strong id="metricGranted">—</strong></article>
-      <article><span>Bloqueadas</span><strong id="metricBlocked">—</strong></article>
-    </section>
-
-    <section class="panel" aria-labelledby="tools-heading">
-      <div class="panel-head">
-        <div>
-          <span class="eyebrow">CATÁLOGO</span>
-          <h2 id="tools-heading">Ferramentas existentes</h2>
-        </div>
-        <label class="search-field">
-          <span class="sr-only">Buscar ferramenta</span>
-          <input id="searchInput" type="search" placeholder="Buscar por nome ou identificador…" autocomplete="off" />
-        </label>
-      </div>
-
-      <div id="statusMessage" class="status-message" role="status" aria-live="polite"></div>
-      <div id="toolsGrid" class="tools-grid" aria-live="polite" aria-busy="true"></div>
-    </section>
-  </main>
-
-  <dialog id="confirmDialog" class="confirm-dialog">
-    <form method="dialog">
-      <span class="eyebrow">CONFIRMAR ALTERAÇÃO</span>
-      <h2>Revogar acesso?</h2>
-      <p id="confirmMessage"></p>
-      <div class="dialog-actions">
-        <button value="cancel" class="btn btn-secondary">Cancelar</button>
-        <button value="confirm" class="btn btn-danger">Revogar acesso</button>
-      </div>
-    </form>
-  </dialog>
-
-  <script type="module" src="/admin-ferramentas.js"></script>
+  <p>Esta área foi consolidada na <a href="/admin-central.html">Administração central</a>.</p>
+  <script>window.location.replace('/admin-central.html');</script>
 </body>
 </html>
