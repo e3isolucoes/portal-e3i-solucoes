@@ -36,7 +36,7 @@ jobs:
       - name: Rebuild database from migrations
         working-directory: painel-obrigacoes
         run: |
-          ./scripts/generate-supabase-schema.sh
+          bash scripts/generate-supabase-schema.sh
 
       - name: Verify generated schema is committed
         id: schema_diff
