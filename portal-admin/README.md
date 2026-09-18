@@ -129,8 +129,10 @@ Crie uma nova revisão em modo `Multiple`, inicialmente sem retirar tráfego da 
 O teste funcional mínimo deve confirmar:
 
 - login e Portal existentes continuam funcionando;
-- `/admin-ferramentas.html` continua carregando;
+- `/admin-ferramentas.html` redireciona para `/admin-central.html`;
 - `/admin-central.html` carrega somente com sessão válida;
+- usuário comum não recebe o link **Administração** e recebe bloqueio ao abrir a rota diretamente;
+- o administrador-raiz pode promover/rebaixar administradores e o delegado não pode propagar privilégios;
 - administrador consegue ler e salvar parâmetros;
 - usuário não administrador recebe `403` nas rotas de parâmetros;
 - tentativa cross-organization recebe `404`;
