@@ -29,6 +29,9 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: painel-obrigacoes/package-lock.json
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
       - name: Install application dependencies
         run: npm ci --ignore-scripts
       - name: Install API dependencies
@@ -63,6 +66,21 @@ jobs:
         run: |
           npm audit --omit=dev --audit-level=high
           npm audit --omit=dev --audit-level=high --prefix api
+      - name: Verify tenant RLS migration coverage
+        run: npm run db:rls:audit
+      - name: Rebuild schema from migrations
+        id: schema-drift
+        run: |
+          npm run db:schema:generate -- --output sql/schema.generated.sql
+          diff -u sql/schema.sql sql/schema.generated.sql
+      - name: Upload generated schema on drift
+        if: failure() && steps.schema-drift.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-supabase-schema
+          path: painel-obrigacoes/sql/schema.generated.sql
+          if-no-files-found: ignore
+          retention-days: 7
 
   build_and_deploy:
     needs: validate
