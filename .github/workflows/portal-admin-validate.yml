@@ -31,6 +31,8 @@ jobs:
           node --check portal-admin/test-admin-central.cjs
           node --check portal-admin/patch-admin-users.cjs
           node --check portal-admin/test-admin-users.cjs
+          node --check portal-admin/reconcile-admin-authority.cjs
+          node --check portal-admin/test-admin-authority.cjs
           node --check portal-admin/admin-ferramentas.js
       - name: Validate central admin contracts and patch fixture
         env:
@@ -44,6 +46,10 @@ jobs:
           E3I_ADMIN_USERS_PATCH_SCRIPT: ${{ github.workspace }}/portal-admin/patch-admin-users.cjs
           E3I_ADMIN_USERS_SNIPPET: ${{ github.workspace }}/portal-admin/admin-users-server-snippet.txt
         run: node portal-admin/test-admin-users.cjs
+      - name: Validate root authority reconciliation
+        env:
+          E3I_ADMIN_AUTHORITY_SCRIPT: ${{ github.workspace }}/portal-admin/reconcile-admin-authority.cjs
+        run: node portal-admin/test-admin-authority.cjs
       - name: Publish QA summary
         run: |
           {
@@ -54,6 +60,8 @@ jobs:
             echo '- Tenant/admin isolation: validated in fixture tests'
             echo '- Self-revoke and last-admin protection: validated'
             echo '- User sessions and forced first-login: validated'
-            echo '- Legacy access screen: preserved'
+            echo '- Root-only delegation and provenance: validated'
+            echo '- Direct admin page authorization: validated'
+            echo '- Legacy access screen: redirects to central admin'
             echo '- Automatic deployment: not added'
           } >> "$GITHUB_STEP_SUMMARY"
