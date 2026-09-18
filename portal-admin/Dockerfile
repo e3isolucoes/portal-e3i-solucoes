@@ -24,6 +24,7 @@ COPY first-login.js /app/dist/first-login.js
 COPY first-login.css /app/dist/first-login.css
 COPY first-login-server-snippet.txt /tmp/first-login-server-snippet.txt
 COPY patch-first-login.cjs /tmp/patch-first-login.cjs
+COPY test-first-login.cjs /tmp/test-first-login.cjs
 COPY migrate-gra-users.cjs /app/migrate-gra-users.cjs
 
 RUN node /tmp/patch-first-login.cjs \
@@ -36,6 +37,7 @@ RUN node /tmp/patch-first-login.cjs \
  && node --check /app/dist/client-tool-auth.js \
  && node --check /app/dist/first-login.js \
  && node --check /app/migrate-gra-users.cjs \
+ && E3I_FIRST_LOGIN_DIR=/app/dist node /tmp/test-first-login.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_PATCH_SCRIPT=/tmp/patch-admin-central.cjs E3I_ADMIN_SNIPPET=/tmp/admin-central-server-snippet.txt node /tmp/test-admin-central.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_USERS_PATCH_SCRIPT=/tmp/patch-admin-users.cjs E3I_ADMIN_USERS_SNIPPET=/tmp/admin-users-server-snippet.txt node /tmp/test-admin-users.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_BRAND_PATCH_SCRIPT=/tmp/patch-brand-assets.cjs E3I_ADMIN_BRAND_SNIPPET=/tmp/brand-assets-server-snippet.txt E3I_ADMIN_BRAND_LOGO_FILE=/app/dist/e3i-logo.svg node /tmp/test-brand-assets.cjs \
@@ -79,6 +81,8 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq 'current-password' /app/dist/first-login.js \
  && grep -Fq 'XMLHttpRequest' /app/dist/first-login.js \
  && grep -Fq 'data-e3i-first-login-start' /app/dist/first-login.js \
+ && grep -Fq 'data-e3i-cancel' /app/dist/first-login.js \
+ && grep -Fq 'closeFirstLogin' /app/dist/first-login.js \
  && grep -Fq '/first-login.js' /app/dist/index.html \
  && echo 'PORTAL_ADMIN_CENTRAL_V2_VALIDATION_OK' \
  && echo 'PORTAL_ADMIN_BRAND_ASSET_VALIDATION_OK' \
