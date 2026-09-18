@@ -3,8 +3,8 @@ import {
   CATEGORIES, ADMINISTRATIVE_MODULES, MONTH_NAMES, MONTH_FULL, PRIORITIES, DAY_TYPES, BUSINESS_DAY_SHIFTS,
 } from '../constants.js';
 import { escapeHtml } from '../dateUtils.js';
-import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js';
-import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js';
+import { doSaveObligation, doDeleteObligation, doLoadComments, doAddComment, doDeleteComment, doLoadChecklist, doAddChecklistItem, doDeleteChecklistItem } from '../data.js?v=20260917-task-actions-v1';
+import { validatorFieldHtml, bindValidatorField, readValidatorField } from './validatorField.js?v=20260917-task-actions-v1';
 import { suggestChecklist } from '../checklistSuggestions.js?v=20260910-cognito-auth-v1';
 
 let onSavedCallback = null;
