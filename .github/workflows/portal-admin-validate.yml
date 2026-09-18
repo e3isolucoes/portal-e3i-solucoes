@@ -31,7 +31,6 @@ jobs:
           node --check portal-admin/test-admin-central.cjs
           node --check portal-admin/patch-admin-users.cjs
           node --check portal-admin/test-admin-users.cjs
-          node --check portal-admin/admin-ferramentas.js
           node --check portal-admin/first-login.js
           node --check portal-admin/test-first-login.cjs
       - name: Validate central admin contracts and patch fixture
@@ -61,6 +60,6 @@ jobs:
             echo '- Self-revoke and last-admin protection: validated'
             echo '- User sessions and forced first-login: validated'
             echo '- First-login cancel/escape/backdrop behavior: validated'
-            echo '- Legacy access screen: preserved'
+            echo '- Legacy access screen: removed'
             echo '- Automatic deployment: not added'
           } >> "$GITHUB_STEP_SUMMARY"
