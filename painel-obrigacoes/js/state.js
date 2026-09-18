@@ -50,7 +50,8 @@ export function isSuperUser() {
 // Gestores mantêm a operação sem receber o poder reservado ao administrador
 // de criar contas, trocar papéis ou revogar acessos.
 export function isManager() {
-  return ['super_admin', 'admin', 'gestor'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
+  const role = String(STATE.profile?.role || '').trim().toLowerCase();
+  return ['super_admin', 'admin', 'gestor', 'manager'].includes(role) && STATE.profile?.active !== false;
 }
 
 // A visibilidade da carteira é uma permissão própria: não deve depender da

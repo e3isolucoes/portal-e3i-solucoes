@@ -175,6 +175,27 @@ test('validação continua obrigatória quando foi explicitamente configurada', 
   );
 });
 
+test('gestor pode salvar alteração de atividade no próprio workspace', async () => {
+  const current = {
+    ...obligation(),
+    name: 'DCTFWeb',
+    category: 'federal',
+    frequency: 'mensal',
+    day_of_month: 15,
+    version: 1,
+  };
+  const client = transactionalClient([current]);
+  const managerAuth = { ...auth, role: 'manager' };
+
+  const updated = await new Repository(client, 'table').update(managerAuth, 'obligations', current.id, {
+    name: 'DCTFWeb ajustada',
+    version: 1,
+  });
+
+  assert.equal(updated.name, 'DCTFWeb ajustada');
+  assert.equal(updated.version, 2);
+});
+
 test('membro pode criar empresa pelo fluxo operacional, mas não alterar o cadastro mestre', async () => {
   const client = transactionalClient([]);
   const repository = new Repository(client, 'table');

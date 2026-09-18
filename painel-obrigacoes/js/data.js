@@ -425,7 +425,11 @@ export async function doSaveObligation(id, formData, onDone) {
     } else if (err.code === '42501' && err.importRpcMissing) {
       showToast('A correção de segurança ainda não foi aplicada ao banco. Execute sql/migrations/20260813_fix_import_obligations.sql e tente novamente.', 'error');
     } else if (err.code === '42501') {
-      showToast('Seu perfil precisa estar ativo e vinculado ao espaço da empresa para cadastrar obrigações.', 'error');
+      showToast(id
+        ? 'Seu perfil precisa estar ativo, vinculado ao espaço da empresa e autorizado a alterar esta atividade.'
+        : 'Seu perfil precisa estar ativo e vinculado ao espaço da empresa para cadastrar obrigações.', 'error');
+    } else if (Number(err?.status) === 403) {
+      showToast(err?.message || 'Seu perfil não tem permissão para salvar alterações nesta atividade.', 'error');
     } else {
       showToast('Não foi possível salvar. Verifique os campos e tente novamente.', 'error');
     }

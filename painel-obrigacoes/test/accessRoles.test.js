@@ -24,6 +24,13 @@ test('gestor tem acesso operacional sem ser administrador de acessos', () => {
   assert.equal(canViewAllObligations(), true);
   assert.match(renderToolbar(), /data-tab="manage"/);
   assert.doesNotMatch(renderToolbar(), /data-tab="mine"/);
+
+  STATE.profile = { role: 'manager', active: true };
+  assert.equal(isManager(), true);
+  assert.equal(canViewAllObligations(), true);
+
+  STATE.profile = { role: 'GESTOR', active: true };
+  assert.equal(isManager(), true);
 });
 
 test('validação de atividade é opt-in e não bloqueia registro legado', () => {
@@ -105,6 +112,18 @@ test('módulos administrativos não reutilizam categorias de obrigação acessó
   assert.match(migration, /can_access_module\(module_key\)/);
   assert.match(modal, /Categoria da obrigação acessória/);
   assert.match(modal, /activityTypeSel\.value !== 'obrigacao_acessoria'/);
+});
+
+test('hotfix garante que gestor salve alterações de atividade sem perder isolamento', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260918_allow_manager_activity_updates.sql', import.meta.url), 'utf8');
+
+  assert.match(sql, /create or replace function public\.is_manager/);
+  assert.match(sql, /'gestor', 'manager'/);
+  assert.match(sql, /create policy obligations_tenant_update/);
+  assert.match(sql, /public\.can_access_workspace\(workspace_id\)/);
+  assert.match(sql, /public\.is_manager\(auth\.uid\(\)\)/);
+  assert.match(sql, /public\.can_access_module\(module_key\)/);
+  assert.doesNotMatch(sql, /using \(public\.is_admin\(auth\.uid\(\)\)\)/);
 });
 
 test('migração cria gestor, libera criação e mantém comprovantes visíveis à equipe', async () => {
