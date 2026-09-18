@@ -252,7 +252,10 @@ export async function doMarkDone(obligationId, onDone) {
       showToast('Alguém já registrou essa conclusão agora há pouco. Atualizando o painel…', 'info');
       await refreshObligationsAndCompletions();
     } else {
-      showToast('Não foi possível salvar a conclusão. Tente novamente.', 'error');
+      const detail = Number(err?.status) >= 400 && Number(err?.status) < 500 && err?.message
+        ? ` Motivo: ${err.message}`
+        : ' Tente novamente.';
+      showToast(`Não foi possível salvar a conclusão.${detail}`, 'error');
     }
   } finally {
     onDone?.();
@@ -370,7 +373,7 @@ export async function doSaveObligation(id, formData, onDone) {
       priority: formData.priority || 'media',
       business_day_shift: formData.business_day_shift || 'nenhum',
       day_type: formData.day_type || 'fixo',
-      requires_validation: formData.requires_validation !== false,
+      requires_validation: formData.requires_validation === true,
       validator_id: formData.validator_id || null,
       activity_type: formData.activity_type || 'obrigacao_acessoria',
       process_name: formData.process_name || '',
