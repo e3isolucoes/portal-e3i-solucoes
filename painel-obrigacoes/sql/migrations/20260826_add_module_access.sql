@@ -9,13 +9,13 @@ update public.profiles p
 set module_access = coalesce((select array_agg(distinct c.name order by c.name) from public.categories c where coalesce(c.ativo, true)), '{}')
 where cardinality(p.module_access) = 0 and p.created_at < now();
 
-create or replace function public.can_access_module(module_key text)
-returns boolean language sql stable security definer set search_path = public as $$
+create or replace function public.can_access_module(requested_module text)
+returns boolean language sql stable security definer set search_path = public as $
   select coalesce((
-    select active and (role in ('admin', 'super_admin') or module_key = any(module_access))
+    select active and (role in ('admin', 'super_admin') or requested_module = any(module_access))
     from public.profiles where id = auth.uid()
   ), false);
-$$;
+$;
 revoke all on function public.can_access_module(text) from public;
 grant execute on function public.can_access_module(text) to authenticated;
 
