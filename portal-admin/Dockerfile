@@ -1,10 +1,6 @@
 ARG BASE_IMAGE=acre3i431811.azurecr.io/e3i-portal@sha256:04d63f77dbd8fef806a9b19601909b10901f2e8f0a4558df22a93bdeed4b3fb1
 FROM ${BASE_IMAGE}
 
-COPY admin-ferramentas.html /app/dist/admin-ferramentas.html
-COPY admin-ferramentas.css /app/dist/admin-ferramentas.css
-COPY admin-ferramentas.js /app/dist/admin-ferramentas.js
-
 COPY admin-central.html /app/dist/admin-central.html
 COPY admin-central.css /app/dist/admin-central.css
 COPY admin-central.js /app/dist/admin-central.js
@@ -33,7 +29,6 @@ RUN node /tmp/patch-first-login.cjs \
  && node /tmp/patch-brand-assets.cjs \
  && node --check /app/dist/server.cjs \
  && node --check /app/dist/admin-central.js \
- && node --check /app/dist/admin-ferramentas.js \
  && node --check /app/dist/client-tool-auth.js \
  && node --check /app/dist/first-login.js \
  && node --check /app/migrate-gra-users.cjs \
@@ -42,18 +37,12 @@ RUN node /tmp/patch-first-login.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_USERS_PATCH_SCRIPT=/tmp/patch-admin-users.cjs E3I_ADMIN_USERS_SNIPPET=/tmp/admin-users-server-snippet.txt node /tmp/test-admin-users.cjs \
  && E3I_ADMIN_DIR=/app/dist E3I_ADMIN_BRAND_PATCH_SCRIPT=/tmp/patch-brand-assets.cjs E3I_ADMIN_BRAND_SNIPPET=/tmp/brand-assets-server-snippet.txt E3I_ADMIN_BRAND_LOGO_FILE=/app/dist/e3i-logo.svg node /tmp/test-brand-assets.cjs \
  && test -s /app/dist/e3i-logo.svg \
- && test -s /app/dist/admin-ferramentas.html \
- && test -s /app/dist/admin-ferramentas.css \
- && test -s /app/dist/admin-ferramentas.js \
  && test -s /app/dist/admin-central.html \
  && test -s /app/dist/admin-central.css \
  && test -s /app/dist/admin-central.js \
  && test -s /app/dist/client-tool-auth.js \
  && test -s /app/dist/first-login.js \
  && test -s /app/dist/first-login.css \
- && grep -Fq '/api/client-tools' /app/dist/admin-ferramentas.js \
- && grep -Fq '/api/admin/organizations/' /app/dist/admin-ferramentas.js \
- && grep -Fq 'admin-ferramentas.js' /app/dist/admin-ferramentas.html \
  && grep -Fq '/api/client-tools' /app/dist/admin-central.js \
  && grep -Fq '/users' /app/dist/admin-central.js \
  && grep -Fq 'force-first-login' /app/dist/admin-central.js \
