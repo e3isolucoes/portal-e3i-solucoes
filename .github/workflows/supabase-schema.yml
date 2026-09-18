@@ -1,0 +1,60 @@
+name: Supabase Schema Reproducibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'painel-obrigacoes/sql/**'
+      - 'painel-obrigacoes/supabase/**'
+      - 'painel-obrigacoes/scripts/generate-supabase-schema.sh'
+      - 'painel-obrigacoes/package.json'
+      - '.github/workflows/supabase-schema.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'painel-obrigacoes/sql/**'
+      - 'painel-obrigacoes/supabase/**'
+      - 'painel-obrigacoes/scripts/generate-supabase-schema.sh'
+      - 'painel-obrigacoes/package.json'
+      - '.github/workflows/supabase-schema.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reset-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Rebuild database from migrations
+        working-directory: painel-obrigacoes
+        run: |
+          ./scripts/generate-supabase-schema.sh
+
+      - name: Verify generated schema is committed
+        id: schema_diff
+        shell: bash
+        run: |
+          if git diff --exit-code -- painel-obrigacoes/sql/schema.sql; then
+            echo "Schema gerado está sincronizado."
+            exit 0
+          fi
+
+          echo "::error::painel-obrigacoes/sql/schema.sql diverge do schema produzido por supabase db reset + db dump."
+          echo "Execute 'npm run schema:generate' e commite o resultado."
+          exit 1
+
+      - name: Upload generated schema for debugging
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-supabase-schema
+          path: painel-obrigacoes/sql/schema.sql
+          if-no-files-found: error
