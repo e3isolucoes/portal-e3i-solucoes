@@ -186,6 +186,19 @@ test('gravações operacionais enviam explicitamente o workspace do perfil', asy
   }
 });
 
+test('histórico de atividade congela competência e estrutura concluída', async () => {
+  const sql = await readFile(new URL('../sql/migrations/20260918_freeze_activity_history.sql', import.meta.url), 'utf8');
+
+  assert.match(sql, /add column if not exists competence_date date/);
+  assert.match(sql, /add column if not exists obligation_snapshot jsonb/);
+  assert.match(sql, /add column if not exists structure_history jsonb/);
+  assert.match(sql, /update public\.completions c[\s\S]*?completion_competence_date/);
+  assert.match(sql, /trg_freeze_completion_history_insert/);
+  assert.match(sql, /trg_preserve_obligation_structure_history/);
+  assert.match(sql, /new\.competence_date := old\.competence_date/);
+  assert.match(sql, /new\.obligation_snapshot := old\.obligation_snapshot/);
+});
+
 test('migração endurecida mantém criação e conclusão restritas ao workspace ativo', async () => {
   const sql = await readFile(new URL('../sql/migrations/20260818_harden_workspace_writes.sql', import.meta.url), 'utf8');
   assert.match(sql, /obligations_tenant_insert[\s\S]*can_access_workspace\(workspace_id\)/);
