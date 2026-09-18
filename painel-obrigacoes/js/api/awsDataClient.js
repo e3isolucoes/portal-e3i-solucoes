@@ -6,8 +6,12 @@ let requestQueue = Promise.resolve();
 const versions = new Map();
 
 function remember(entity, record) {
-  if (record?.id && Number.isInteger(record.version)) versions.set(`${entity}:${record.id}`, record.version);
-  return record;
+  if (!record?.id) return record;
+  const version = Number.isInteger(record.version) && record.version > 0 ? record.version : 1;
+  versions.set(`${entity}:${record.id}`, version);
+  return Number.isInteger(record.version) && record.version > 0
+    ? record
+    : { ...record, version };
 }
 
 function waitForApiSlot() {
