@@ -46,7 +46,10 @@ export function isAdmin() {
 export function hasAdministrationAccess(profile = STATE.profile) {
   if (!profile || profile.active === false) return false;
   if (['super_admin', 'admin'].includes(String(profile.role || '').toLowerCase())) return true;
-  const grants = Array.isArray(profile.module_grants) ? profile.module_grants : [];
+  const grants = [
+    ...(Array.isArray(profile.module_grants) ? profile.module_grants : []),
+    ...(Array.isArray(profile.module_access) ? profile.module_access : []),
+  ];
   return grants.includes('administracao');
 }
 
