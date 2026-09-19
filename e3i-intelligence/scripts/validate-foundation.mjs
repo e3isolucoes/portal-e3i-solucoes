@@ -28,6 +28,15 @@ assert(manifest.deployment.existingToolDependency === false, 'existing tools mus
 assert(manifest.guardrails.operationalToolsMustWorkWhenDisabled === true, 'operational independence guardrail missing');
 assert(manifest.guardrails.customerDataForModelTraining === false, 'customer model-training default must remain false');
 assert(manifest.guardrails.agentsReadOnlyInitially === true, 'agents must remain read-only initially');
+assert(manifest.deployment.shadowStaging?.enabled === true, 'shadow staging must be explicitly enabled');
+assert(manifest.deployment.shadowStaging?.automatic === false, 'shadow staging deployment must remain manual');
+assert(manifest.deployment.shadowStaging?.environment === 'staging', 'shadow rollout must be staging-only');
+assert(manifest.deployment.shadowStaging?.shadowModeRequired === true, 'shadow mode must be mandatory');
+assert(manifest.deployment.productionFeatureEnabledByDefault === false, 'production Intelligence must remain disabled by default');
+assert(Array.isArray(manifest.deployment.sourceModules) && manifest.deployment.sourceModules.includes('obrigacoes') && manifest.deployment.sourceModules.includes('suprimentos'), 'shadow sources must include obrigacoes and suprimentos');
+assert(manifest.guardrails.sourceModuleWritesAllowed === false, 'shadow consumer must never write to source modules');
+assert(manifest.guardrails.telemetryFailureMustNotBreakOperation === true, 'telemetry failure isolation guardrail missing');
+assert(manifest.guardrails.rawOperationalPayloadCopied === false, 'raw operational payload copy must remain disabled');
 
 for (const [name, schema] of Object.entries({ evidence, event, mapping, saving })) {
   assert(schema.type === 'object', `${name} contract must be an object`);
