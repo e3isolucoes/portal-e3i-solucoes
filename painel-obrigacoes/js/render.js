@@ -67,7 +67,7 @@ function renderNotificationBell() {
       + '</div>';
   }
   if (pendingValidation) {
-    listHtml += '<div class="dd-item" data-action="tab" data-tab="validacoes" style="white-space:normal;">'
+    listHtml += '<div class="dd-item dd-item-wrap" data-action="tab" data-tab="validacoes">'
       + `<span class="status-pill tone-amber dd-status-leading">Validar</span>`
       + `${pendingValidation} tarefa(s) aguardando sua validação`
       + '</div>';
