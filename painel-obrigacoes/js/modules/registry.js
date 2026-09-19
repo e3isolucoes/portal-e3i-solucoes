@@ -16,8 +16,10 @@ function isAccessible(module, context) {
 }
 
 export function hasModuleGrant(profile, grant) {
-  if (BASELINE_MODULE_GRANTS.has(grant) && profile?.active !== false) return true;
-  return !Array.isArray(profile?.module_grants) || profile.module_grants.includes(grant);
+  if (!profile || profile.active === false) return false;
+  if (BASELINE_MODULE_GRANTS.has(grant)) return true;
+  if (['admin', 'super_admin'].includes(String(profile.role || '').toLowerCase())) return true;
+  return Array.isArray(profile.module_grants) && profile.module_grants.includes(grant);
 }
 
 export class ModuleRegistry {
@@ -51,12 +53,13 @@ export class ModuleRegistry {
 export function moduleContext({ state, permissions }) {
   const configuredGrants = state.profile?.module_grants;
   const activeSession = Boolean(state.session && state.profile && state.profile.active !== false);
-  const moduleGrants = Array.isArray(configuredGrants)
-    ? new Set([
-        ...configuredGrants,
+  const administrator = ['admin', 'super_admin'].includes(String(state.profile?.role || '').toLowerCase());
+  const moduleGrants = administrator
+    ? null
+    : new Set([
+        ...(Array.isArray(configuredGrants) ? configuredGrants : []),
         ...(activeSession ? BASELINE_MODULE_GRANTS : []),
-      ])
-    : null;
+      ]);
 
   return Object.freeze({
     state,
