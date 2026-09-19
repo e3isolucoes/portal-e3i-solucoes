@@ -74,7 +74,9 @@ export function renderTeamManage() {
       : '';
     const grantedModules = Array.isArray(p.module_access) ? p.module_access : [];
     const adminRole = ['admin', 'super_admin'].includes(p.role);
-    const administrationGranted = adminRole || (Array.isArray(p.module_grants) && p.module_grants.includes('administracao'));
+    const administrationGranted = adminRole
+      || (Array.isArray(p.module_grants) && p.module_grants.includes('administracao'))
+      || (Array.isArray(p.module_access) && p.module_access.includes('administracao'));
     const administrationControl = adminRole
       ? '<div class="mgmt-sub">Administração: <strong>Admin da Ferramenta</strong></div>'
       : (isAdmin()
