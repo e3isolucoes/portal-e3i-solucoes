@@ -6,7 +6,7 @@ import {
   STATE, isAdmin, isManager, hasAdministrationAccess, canWriteObligations, canViewAllObligations,
 } from '../js/state.js';
 import { renderBoard } from '../js/ui/board.js';
-import { renderToolbar } from '../js/ui/toolbar.js';
+import { renderToolbar, renderSidebarNavigation } from '../js/ui/toolbar.js';
 import { validatorFieldHtml } from '../js/ui/validatorField.js';
 
 test.afterEach(() => {
@@ -23,29 +23,29 @@ test('gestor tem acesso operacional, mas Administração exige concessão explí
   assert.equal(isAdmin(), false);
   assert.equal(hasAdministrationAccess(), false);
   assert.equal(canViewAllObligations(), true);
-  assert.doesNotMatch(renderToolbar(), /data-tab="manage"/);
-  assert.doesNotMatch(renderToolbar(), /data-tab="mine"/);
+  assert.doesNotMatch(renderSidebarNavigation(), /data-tab="manage"/);
+  assert.doesNotMatch(renderSidebarNavigation(), /data-tab="mine"/);
 
   STATE.profile = { role: 'manager', active: true, module_grants: ['administracao'] };
   assert.equal(isManager(), true);
   assert.equal(hasAdministrationAccess(), true);
-  assert.match(renderToolbar(), /data-tab="manage"/);
+  assert.match(renderSidebarNavigation(), /data-tab="manage"/);
 
   STATE.profile = { role: 'admin', active: true, module_grants: [] };
   assert.equal(isAdmin(), true);
   assert.equal(hasAdministrationAccess(), true);
-  assert.match(renderToolbar(), /data-tab="manage"/);
+  assert.match(renderSidebarNavigation(), /data-tab="manage"/);
 });
 
 test('membro delegado recebe Administração sem virar Admin da Ferramenta', () => {
   STATE.profile = { role: 'membro', active: true, module_access: ['fiscal', 'administracao'] };
   assert.equal(isAdmin(), false);
   assert.equal(hasAdministrationAccess(), true);
-  assert.match(renderToolbar(), /Administração/);
+  assert.match(renderSidebarNavigation(), /Administração/);
 
   STATE.profile = { role: 'membro', active: true, module_access: ['fiscal'] };
   assert.equal(hasAdministrationAccess(), false);
-  assert.doesNotMatch(renderToolbar(), /Administração/);
+  assert.doesNotMatch(renderSidebarNavigation(), /Administração/);
 });
 
 test('validação de atividade é opt-in e não bloqueia registro legado', () => {
@@ -89,7 +89,7 @@ test('membro ativo pode incluir, editar e excluir atividades/obrigações', asyn
   assert.equal(canViewAllObligations(), false);
   assert.match(renderToolbar(), /data-action="new"/);
   assert.match(renderBoard({ onlyMine: true }), /data-action="edit" data-id="ob-1"/);
-  assert.doesNotMatch(renderToolbar(), /data-tab="manage"/);
+  assert.doesNotMatch(renderSidebarNavigation(), /data-tab="manage"/);
 
   const [renderSource, modalSource, validatorSource, modelSource, dataSource, checklistSource, contractSource] = await Promise.all([
     readFile(new URL('../js/render.js', import.meta.url), 'utf8'),
