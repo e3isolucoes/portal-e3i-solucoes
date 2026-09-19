@@ -62,8 +62,12 @@ jobs:
             ZIP="/tmp/${FUNCTION_NAME}.zip"
             curl -fsSL "$LOCATION" -o "$ZIP"
             unzip -l "$ZIP" | sed -n '1,100p'
-            TARGET="$(unzip -Z1 "$ZIP" | grep -E '(pre-token-generation|entitlements)\.js$' | head -n1 || true)"
-            if [ -z "$TARGET" ]; then
+            if [[ "$FUNCTION_NAME" == *"-pre-token" ]]; then
+              TARGET="pre-token-generation.js"
+            else
+              TARGET="entitlements.js"
+            fi
+            if ! unzip -Z1 "$ZIP" | grep -Fxq "$TARGET"; then
               echo "HANDLER_BUNDLE_NOT_FOUND"
               continue
             fi
