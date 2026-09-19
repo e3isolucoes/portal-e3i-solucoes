@@ -16,8 +16,14 @@ function isAccessible(module, context) {
 }
 
 export function hasModuleGrant(profile, grant) {
-  if (BASELINE_MODULE_GRANTS.has(grant) && profile?.active !== false) return true;
-  return !Array.isArray(profile?.module_grants) || profile.module_grants.includes(grant);
+  if (!profile || profile.active === false) return false;
+  if (BASELINE_MODULE_GRANTS.has(grant)) return true;
+  if (['admin', 'super_admin'].includes(String(profile.role || '').toLowerCase())) return true;
+  if (grant === 'administracao') {
+    return (Array.isArray(profile.module_grants) && profile.module_grants.includes(grant))
+      || (Array.isArray(profile.module_access) && profile.module_access.includes(grant));
+  }
+  return !Array.isArray(profile.module_grants) || profile.module_grants.includes(grant);
 }
 
 export class ModuleRegistry {

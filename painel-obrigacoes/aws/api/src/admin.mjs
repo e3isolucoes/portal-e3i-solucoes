@@ -9,6 +9,16 @@ const fail = (message, statusCode) => Object.assign(new Error(message), { status
 const ROLES = new Set(['member', 'manager', 'admin', 'super_admin']);
 const STATUSES = new Set(['trial', 'full', 'suspended']);
 const normalizeRole = (role) => ({ membro: 'member', gestor: 'manager', administrador: 'admin' })[role] || role || 'member';
+const normalizeGrants = (value) => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > 32) throw fail('Concessões inválidas.', 400);
+  const grants = [...new Set(value.map((grant) => String(grant || '').trim()).filter(Boolean))];
+  if (grants.some((grant) => !/^[a-z][a-z0-9-]{1,63}$/.test(grant))) throw fail('Concessão inválida.', 400);
+  return grants;
+};
+const isToolAdmin = (auth) => ['admin', 'super_admin'].includes(auth?.role);
+const hasAdministrationGrant = (auth) => isToolAdmin(auth) || (Array.isArray(auth?.moduleGrants) && auth.moduleGrants.includes('administracao'));
+
 
 function requireSuperAdmin(auth) {
   if (auth.role !== 'super_admin') throw fail('Somente super_admin pode realizar esta operação.', 403);
@@ -83,7 +93,8 @@ export class AdminService {
   async inviteUser(auth, input) {
     const workspaceId = String(input.workspaceId || auth.workspaceId);
     const role = normalizeRole(input.role);
-    this.requireMembershipAdministration(auth, workspaceId, role);
+    const moduleGrants = normalizeGrants(input.module_grants) || [];
+    this.requireMembershipAdministration(auth, workspaceId, role, { grantsChanged: moduleGrants.includes('administracao') });
     const email = String(input.email || '').trim().toLowerCase();
     const displayName = String(input.displayName || '').trim();
     if (!/^\S+@\S+\.\S+$/.test(email) || !displayName) throw fail('Informe nome e e-mail válidos.', 400);
@@ -115,8 +126,8 @@ export class AdminService {
         if (!/^[a-zA-Z0-9_.:@+-]{1,200}$/.test(userId || '')) throw fail('A identidade existente não possui identificador válido.', 409);
       }
       const now = timestamp();
-      const profile = { PK: tenantPk(workspaceId), SK: `PROFILE#${userId}`, id: userId, email, display_name: displayName, role, workspace_id: workspaceId, active: true, version: 1, entityType: 'profiles', created_at: now, updated_at: now, schemaVersion: SCHEMA_VERSION };
-      const membership = { PK: membershipPk(userId), SK: `MEMBERSHIP#${workspaceId}`, userId, workspaceId, email, role, active: true, entityType: 'membership', schemaVersion: SCHEMA_VERSION };
+      const profile = { PK: tenantPk(workspaceId), SK: `PROFILE#${userId}`, id: userId, email, display_name: displayName, role, module_grants: moduleGrants, workspace_id: workspaceId, active: true, version: 1, entityType: 'profiles', created_at: now, updated_at: now, schemaVersion: SCHEMA_VERSION };
+      const membership = { PK: membershipPk(userId), SK: `MEMBERSHIP#${workspaceId}`, userId, workspaceId, email, role, module_grants: moduleGrants, active: true, entityType: 'membership', schemaVersion: SCHEMA_VERSION };
       await this.client.send(new TransactWriteCommand({ TransactItems: [
         { Put: { TableName: this.tableName, Item: profile, ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)' } },
         { Put: { TableName: this.tableName, Item: membership, ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)' } },
@@ -135,21 +146,26 @@ export class AdminService {
     }
   }
 
-  requireMembershipAdministration(auth, workspaceId, role) {
+  requireMembershipAdministration(auth, workspaceId, role, { grantsChanged = false } = {}) {
     if (!ROLES.has(role || 'member')) throw fail('Papel inválido.', 400);
     if (auth.userId === undefined) throw fail('Autenticação obrigatória.', 401);
     if (auth.role === 'super_admin') return;
-    if (auth.role !== 'admin' || auth.workspaceId !== workspaceId || role === 'super_admin') throw fail('Você não pode administrar este vínculo.', 403);
+    if (auth.workspaceId !== workspaceId || !hasAdministrationGrant(auth)) throw fail('Você não pode administrar este vínculo.', 403);
+    if (role === 'super_admin') throw fail('Somente super_admin pode conceder este papel.', 403);
+    if ((role === 'admin' || grantsChanged) && !isToolAdmin(auth)) {
+      throw fail('Somente o Admin da Ferramenta pode conceder papel administrativo ou alterar concessões.', 403);
+    }
   }
 
   async setMembership(auth, userId, workspaceId, input) {
     if (!/^[a-zA-Z0-9_.:@+-]{1,200}$/.test(userId)) throw fail('Identificador de usuário inválido.', 400);
     const role = normalizeRole(input.role);
-    this.requireMembershipAdministration(auth, workspaceId, role);
+    const requestedGrants = normalizeGrants(input.module_grants);
+    this.requireMembershipAdministration(auth, workspaceId, role, { grantsChanged: requestedGrants !== undefined });
     if (auth.userId === userId) throw fail('Não é permitido alterar o próprio vínculo ou papel.', 403);
     const current = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: { PK: membershipPk(userId), SK: `MEMBERSHIP#${workspaceId}` }, ConsistentRead: true }))).Item;
     if (!current && (!input.email || !input.displayName)) throw fail('Para conceder um novo vínculo, informe nome e e-mail.', 400);
-    const membership = { ...(current || { PK: membershipPk(userId), SK: `MEMBERSHIP#${workspaceId}`, userId, workspaceId, email: String(input.email).toLowerCase(), entityType: 'membership', schemaVersion: SCHEMA_VERSION }), role: input.role === undefined ? (current?.role || 'member') : role, active: input.active ?? current?.active ?? true, updated_at: timestamp() };
+    const membership = { ...(current || { PK: membershipPk(userId), SK: `MEMBERSHIP#${workspaceId}`, userId, workspaceId, email: String(input.email).toLowerCase(), entityType: 'membership', schemaVersion: SCHEMA_VERSION }), role: input.role === undefined ? (current?.role || 'member') : role, module_grants: requestedGrants ?? current?.module_grants ?? [], active: input.active ?? current?.active ?? true, updated_at: timestamp() };
     const profileKey = { PK: tenantPk(workspaceId), SK: `PROFILE#${userId}` };
     const profile = (await this.client.send(new GetCommand({ TableName: this.tableName, Key: profileKey, ConsistentRead: true }))).Item;
     const nextProfile = profile || { ...profileKey, id: userId, email: membership.email, display_name: String(input.displayName), workspace_id: workspaceId, entityType: 'profiles', schemaVersion: SCHEMA_VERSION, version: 1, created_at: timestamp() };
@@ -157,7 +173,7 @@ export class AdminService {
       { Put: { TableName: this.tableName, Item: membership,
         ConditionExpression: current ? '#role = :previousRole AND active = :previousActive' : 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
         ...(current ? { ExpressionAttributeNames: { '#role': 'role' }, ExpressionAttributeValues: { ':previousRole': current.role, ':previousActive': current.active } } : {}) } },
-      { Put: { TableName: this.tableName, Item: { ...nextProfile, ...(input.displayName ? { display_name: String(input.displayName).trim() } : {}), role: membership.role, active: membership.active, updated_at: membership.updated_at },
+      { Put: { TableName: this.tableName, Item: { ...nextProfile, ...(input.displayName ? { display_name: String(input.displayName).trim() } : {}), role: membership.role, module_grants: membership.module_grants, active: membership.active, updated_at: membership.updated_at },
         ConditionExpression: profile ? '#role = :previousRole AND active = :previousActive' : 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
         ...(profile ? { ExpressionAttributeNames: { '#role': 'role' }, ExpressionAttributeValues: { ':previousRole': profile.role, ':previousActive': profile.active } } : {}) } },
     ] }));

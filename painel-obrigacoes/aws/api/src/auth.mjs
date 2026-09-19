@@ -88,11 +88,12 @@ export function requireRole(auth, roles) {
 }
 
 export function requireModuleGrant(auth, grant) {
-  // Usuários que chegaram até aqui já possuem associação ativa ao workspace.
-  // Obrigações e comprovantes fazem parte da operação básica desse acesso.
+  // Obrigações são a capacidade operacional básica de todo vínculo ativo.
   if (!grant || BASELINE_MODULE_GRANTS.has(grant)) return;
-  if (!Array.isArray(auth.moduleGrants)) return;
-  if (!auth.moduleGrants.includes(grant)) {
+  // Admin da Ferramenta e super_admin possuem todas as capacidades da ferramenta.
+  if (['admin', 'super_admin'].includes(auth?.role)) return;
+  // Demais usuários precisam de concessão explícita; ausência da lista é deny-by-default.
+  if (!Array.isArray(auth?.moduleGrants) || !auth.moduleGrants.includes(grant)) {
     throw Object.assign(new Error('Módulo não concedido para este acesso.'), { statusCode: 403 });
   }
 }

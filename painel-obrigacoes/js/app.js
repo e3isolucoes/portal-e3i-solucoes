@@ -1,11 +1,11 @@
 import { isSupabaseConfigured } from './supabaseClient.js';
-import { STATE, isAdmin } from './state.js';
+import { STATE, isAdmin, hasAdministrationAccess } from './state.js';
 import {
   onAuthStateChange, getSession, fetchMyProfile, signOut, isPasswordRecoveryUrl, setSession,
   completePortalSso,
 } from './api/auth.js';
 import { bootstrapPortalSession } from './api/portalAuth.js';
-import { loadAll, doChangeModuleAccess } from './data.js?v=20260917-task-actions-v1';
+import { loadAll, doChangeModuleAccess, doChangeAdministrationAccess } from './data.js?v=20260917-task-actions-v1';
 import { render } from './render.js?v=20260917-task-actions-v1';
 import {
   showLogin, wireLogin, showResetPasswordScreen, wireResetPasswordScreen,
@@ -61,8 +61,15 @@ function wireMainModuleCompatibility() {
       return;
     }
 
+    const adminToggle = event.target.closest('input[data-action="team-administration-access"]');
+    if (adminToggle) {
+      if (!isAdmin()) return;
+      doChangeAdministrationAccess(adminToggle.getAttribute('data-id'), adminToggle.checked, render);
+      return;
+    }
+
     const toggle = event.target.closest('input[data-action="team-module-access"]');
-    if (!toggle || !isAdmin()) return;
+    if (!toggle || !hasAdministrationAccess()) return;
     const profileId = toggle.getAttribute('data-id');
     const checked = Array.from(document.querySelectorAll(`input[data-action="team-module-access"][data-id="${profileId}"]:checked`)).map((input) => input.value);
     doChangeModuleAccess(profileId, checked, render);

@@ -1,4 +1,4 @@
-import { STATE, isSuperUser } from '../state.js';
+import { STATE, isAdmin, isSuperUser, hasAdministrationAccess } from '../state.js';
 import { escapeHtml } from '../dateUtils.js';
 import { ADMINISTRATIVE_MODULES } from '../constants.js';
 
@@ -31,7 +31,7 @@ function renderCreateUserForm() {
     + '<div class="field"><label>Papel de acesso</label><select id="newUserRole">'
       + '<option value="membro">Membro</option>'
       + '<option value="gestor">Gestor</option>'
-      + '<option value="admin">Admin</option>'
+      + (isAdmin() ? '<option value="admin">Admin da Ferramenta</option>' : '')
     + '</select></div>'
     + (isSuperUser() ? '<div class="field"><label>Vínculo empresarial</label><select id="newUserWorkspace" required><option value="">Selecione a empresa</option>' + workspaceOptions + '</select><small class="mgmt-sub">Os dados cadastrados por esta pessoa ficarão isolados no ambiente da empresa selecionada.</small></div>' : '')
     + '<button class="btn-primary" type="button" data-action="user-create">Salvar</button>'
@@ -50,6 +50,7 @@ function renderCreateUserForm() {
 }
 
 export function renderTeamManage() {
+  if (!hasAdministrationAccess()) return '<div class="empty">Acesso administrativo não autorizado.</div>';
   let html = renderCredentialsBox();
   html += '<div class="empty" style="text-align:left;padding:14px 16px;margin-bottom:14px;">'
     + 'Crie contas novas abaixo, ou digite o e-mail de quem já tem conta para <strong>editar</strong> nome/papel. '
@@ -71,9 +72,18 @@ export function renderTeamManage() {
     const workspaceControl = isSuperUser() && p.role !== 'super_admin'
       ? `<label class="team-workspace-control">Vínculo empresarial<select class="icon-btn" data-action="team-change-workspace" data-id="${p.id}" aria-label="Alterar vínculo empresarial de ${escapeHtml(p.display_name || p.email)}"><option value="">Sem vínculo</option>${STATE.workspaces.map((item) => `<option value="${item.id}" ${item.id === p.workspace_id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>`
       : '';
-    const grantedModules = Array.isArray(p.module_access) ? p.module_access : ADMINISTRATIVE_MODULES.map((module) => module.key);
-    const moduleControl = ['admin', 'super_admin'].includes(p.role)
-      ? '<div class="mgmt-sub">Módulos: <strong>acesso administrativo completo</strong></div>'
+    const grantedModules = Array.isArray(p.module_access) ? p.module_access : [];
+    const adminRole = ['admin', 'super_admin'].includes(p.role);
+    const administrationGranted = adminRole
+      || (Array.isArray(p.module_grants) && p.module_grants.includes('administracao'))
+      || (Array.isArray(p.module_access) && p.module_access.includes('administracao'));
+    const administrationControl = adminRole
+      ? '<div class="mgmt-sub">Administração: <strong>Admin da Ferramenta</strong></div>'
+      : (isAdmin()
+        ? `<label class="team-admin-access"><input type="checkbox" data-action="team-administration-access" data-id="${p.id}" ${administrationGranted ? 'checked' : ''} ${isMe ? 'disabled' : ''}> Acesso à Administração</label>`
+        : `<div class="mgmt-sub">Administração: <strong>${administrationGranted ? 'liberada' : 'não liberada'}</strong></div>`);
+    const moduleControl = adminRole
+      ? '<div class="mgmt-sub">Módulos operacionais: <strong>acesso completo</strong></div>'
       : `<fieldset class="team-module-access"><legend>Liberação por módulo</legend>${ADMINISTRATIVE_MODULES.map((module) => `<label><input type="checkbox" data-action="team-module-access" data-id="${p.id}" value="${module.key}" ${grantedModules.includes(module.key) ? 'checked' : ''}> ${escapeHtml(module.label)}</label>`).join('')}</fieldset>`;
     return '<div class="mgmt-row">'
       + '<div class="mgmt-main">'
@@ -82,11 +92,14 @@ export function renderTeamManage() {
           + (isActive ? '' : ' · <span class="badge" style="border-color:var(--red);color:var(--red);">Revogado</span>')
         + '</div>'
         + `<div class="mgmt-sub">Empresa vinculada: <strong>${escapeHtml(workspace?.name || 'nenhuma')}</strong></div>`
+        + administrationControl
         + moduleControl
       + '</div>'
       + '<div class="mgmt-actions">'
         + workspaceControl
-        + `<select class="icon-btn" data-action="team-change-role" data-id="${p.id}" aria-label="Alterar papel de ${escapeHtml(p.display_name || p.email)}"><option value="membro" ${p.role === 'membro' ? 'selected' : ''}>Membro</option><option value="gestor" ${p.role === 'gestor' ? 'selected' : ''}>Gestor</option><option value="admin" ${p.role === 'admin' ? 'selected' : ''}>Admin</option></select>`
+        + (isAdmin()
+          ? `<select class="icon-btn" data-action="team-change-role" data-id="${p.id}" aria-label="Alterar papel de ${escapeHtml(p.display_name || p.email)}"><option value="membro" ${p.role === 'membro' ? 'selected' : ''}>Membro</option><option value="gestor" ${p.role === 'gestor' ? 'selected' : ''}>Gestor</option><option value="admin" ${p.role === 'admin' ? 'selected' : ''}>Admin da Ferramenta</option></select>`
+          : `<span class="mgmt-sub">Papel: ${roleLabel}</span>`)
         + `<button class="icon-btn" data-action="team-send-reset" data-id="${p.id}">Redefinir senha</button>`
         + `<button class="icon-btn ${isActive ? 'danger' : ''}" data-action="team-toggle-active" data-id="${p.id}" data-next-active="${!isActive}">${isActive ? 'Revogar acesso' : 'Reativar acesso'}</button>`
       + '</div>'

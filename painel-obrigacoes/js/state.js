@@ -43,6 +43,16 @@ export function isAdmin() {
   return ['super_admin', 'admin'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
 }
 
+export function hasAdministrationAccess(profile = STATE.profile) {
+  if (!profile || profile.active === false) return false;
+  if (['super_admin', 'admin'].includes(String(profile.role || '').toLowerCase())) return true;
+  const grants = [
+    ...(Array.isArray(profile.module_grants) ? profile.module_grants : []),
+    ...(Array.isArray(profile.module_access) ? profile.module_access : []),
+  ];
+  return grants.includes('administracao');
+}
+
 export function isSuperUser() {
   return STATE.profile?.role === 'super_admin' && STATE.profile?.active !== false;
 }

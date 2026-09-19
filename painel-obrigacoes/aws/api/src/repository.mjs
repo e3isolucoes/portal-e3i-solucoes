@@ -213,6 +213,9 @@ export class Repository {
 
   requireSafeProfileRoleChange(auth, current, patch, creating) {
     if (patch.role === undefined) return;
+    if (!['admin', 'super_admin'].includes(auth.role)) {
+      throw Object.assign(new Error('Somente o Admin da Ferramenta pode alterar papéis de acesso.'), { statusCode: 403 });
+    }
     if (patch.role === 'super_admin' || current?.role === 'super_admin') {
       if (auth.role !== 'super_admin') throw Object.assign(new Error('Somente super_admin pode conceder ou alterar este papel.'), { statusCode: 403 });
     }

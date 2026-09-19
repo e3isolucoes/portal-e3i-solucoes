@@ -5,7 +5,7 @@ export const APP_ENV = process.env.APP_ENV || 'dev';
 export const SCHEMA_VERSION = 1;
 
 const ENTITY_CONFIG = Object.freeze({
-  profiles: { prefix: 'PROFILE', grant: 'obrigacoes', writeGrant: 'administracao', read: ['member', 'manager', 'admin', 'super_admin'], write: ['admin', 'super_admin'] },
+  profiles: { prefix: 'PROFILE', grant: 'obrigacoes', writeGrant: 'administracao', read: ['member', 'manager', 'admin', 'super_admin'], create: ['admin', 'super_admin'], write: ['member', 'manager', 'admin', 'super_admin'] },
   companies: { prefix: 'COMPANY', grant: 'obrigacoes', read: ['member', 'manager', 'admin', 'super_admin'], create: ['member', 'manager', 'admin', 'super_admin'], write: ['manager', 'admin', 'super_admin'] },
   obligations: { prefix: 'OBLIGATION', grant: 'obrigacoes', read: ['member', 'manager', 'admin', 'super_admin'], write: ['member', 'manager', 'admin', 'super_admin'] },
   completions: { prefix: 'COMPLETION', grant: 'obrigacoes', read: ['member', 'manager', 'admin', 'super_admin'], write: ['member', 'manager', 'admin', 'super_admin'] },

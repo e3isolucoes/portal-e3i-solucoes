@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
-  STATE, isAdmin, isManager, canWriteObligations, canViewAllObligations,
+  STATE, isAdmin, isManager, hasAdministrationAccess, canWriteObligations, canViewAllObligations,
 } from '../js/state.js';
 import { renderBoard } from '../js/ui/board.js';
 import { renderToolbar } from '../js/ui/toolbar.js';
@@ -17,20 +17,35 @@ test.afterEach(() => {
   STATE.validation = { pending: 0, rejected: 0 };
 });
 
-test('gestor tem acesso operacional sem ser administrador de acessos', () => {
+test('gestor tem acesso operacional, mas Administração exige concessão explícita', () => {
   STATE.profile = { role: 'gestor', active: true };
   assert.equal(isManager(), true);
   assert.equal(isAdmin(), false);
+  assert.equal(hasAdministrationAccess(), false);
   assert.equal(canViewAllObligations(), true);
-  assert.match(renderToolbar(), /data-tab="manage"/);
+  assert.doesNotMatch(renderToolbar(), /data-tab="manage"/);
   assert.doesNotMatch(renderToolbar(), /data-tab="mine"/);
 
-  STATE.profile = { role: 'manager', active: true };
+  STATE.profile = { role: 'manager', active: true, module_grants: ['administracao'] };
   assert.equal(isManager(), true);
-  assert.equal(canViewAllObligations(), true);
+  assert.equal(hasAdministrationAccess(), true);
+  assert.match(renderToolbar(), /data-tab="manage"/);
 
-  STATE.profile = { role: 'GESTOR', active: true };
-  assert.equal(isManager(), true);
+  STATE.profile = { role: 'admin', active: true, module_grants: [] };
+  assert.equal(isAdmin(), true);
+  assert.equal(hasAdministrationAccess(), true);
+  assert.match(renderToolbar(), /data-tab="manage"/);
+});
+
+test('membro delegado recebe Administração sem virar Admin da Ferramenta', () => {
+  STATE.profile = { role: 'membro', active: true, module_access: ['fiscal', 'administracao'] };
+  assert.equal(isAdmin(), false);
+  assert.equal(hasAdministrationAccess(), true);
+  assert.match(renderToolbar(), /Administração/);
+
+  STATE.profile = { role: 'membro', active: true, module_access: ['fiscal'] };
+  assert.equal(hasAdministrationAccess(), false);
+  assert.doesNotMatch(renderToolbar(), /Administração/);
 });
 
 test('validação de atividade é opt-in e não bloqueia registro legado', () => {

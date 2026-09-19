@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AdminService } from '../src/admin.mjs';
 
-const auth = (role, workspaceId = 'tenant-a', userId = 'actor') => ({ role, workspaceId, userId, email: 'actor@test.invalid' });
+const auth = (role, workspaceId = 'tenant-a', userId = 'actor', moduleGrants = []) => ({ role, workspaceId, userId, email: 'actor@test.invalid', moduleGrants });
 const commandName = (command) => command.constructor.name;
 
 test('somente super_admin lista e mantém workspaces pela partição administrativa, sem Scan', async () => {
@@ -71,7 +71,23 @@ test('vincula identidade Cognito existente preservando custom:legacy_user_id', a
   assert.deepEqual(cognitoCommands, ['AdminCreateUserCommand', 'AdminGetUserCommand']);
 });
 
-test('membership nega cross-workspace, autoescalation e manager/member; super_admin opera globalmente', async () => {
+test('delegado com administracao opera o vínculo, mas não altera grants nem promove Admin', async () => {
+  const service = new AdminService({ send: async command => commandName(command) === 'GetCommand' ? { Item: { PK: 'p', SK: 's', role: 'member', module_grants: [], active: true } } : {} }, {}, 'table', 'pool');
+  const delegated = auth('manager', 'tenant-a', 'delegate', ['administracao']);
+
+  const updated = await service.setMembership(delegated, 'target', 'tenant-a', { active: false });
+  assert.equal(updated.active, false);
+  await assert.rejects(() => service.setMembership(delegated, 'target', 'tenant-a', { role: 'admin' }), { statusCode: 403 });
+  await assert.rejects(() => service.setMembership(delegated, 'target', 'tenant-a', { module_grants: ['administracao'] }), { statusCode: 403 });
+});
+
+test('Admin da Ferramenta pode conceder e retirar administracao', async () => {
+  const service = new AdminService({ send: async command => commandName(command) === 'GetCommand' ? { Item: { PK: 'p', SK: 's', role: 'member', module_grants: [], active: true } } : {} }, {}, 'table', 'pool');
+  const updated = await service.setMembership(auth('admin'), 'target', 'tenant-a', { module_grants: ['administracao'] });
+  assert.deepEqual(updated.module_grants, ['administracao']);
+});
+
+test('membership nega cross-workspace e autoescalation sem concessão; super_admin opera globalmente', async () => {
   const service = new AdminService({ send: async command => commandName(command) === 'GetCommand' ? { Item: { PK: 'p', SK: 's', role: 'member', active: true } } : {} }, {}, 'table', 'pool');
   await assert.rejects(() => service.setMembership(auth('admin'), 'target', 'tenant-b', { role: 'member' }), { statusCode: 403 });
   await assert.rejects(() => service.setMembership(auth('manager'), 'target', 'tenant-a', { role: 'member' }), { statusCode: 403 });
