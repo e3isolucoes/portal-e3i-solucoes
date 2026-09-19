@@ -5,8 +5,8 @@ import {
   completePortalSso,
 } from './api/auth.js';
 import { bootstrapPortalSession } from './api/portalAuth.js';
-import { loadAll, doChangeModuleAccess, doChangeAdministrationAccess } from './data.js?v=20260917-task-actions-v1';
-import { render } from './render.js?v=20260917-task-actions-v1';
+import { loadAll, doChangeModuleAccess, doChangeAdministrationAccess } from './data.js?v=20260919-premium-shell-v1';
+import { render } from './render.js?v=20260919-premium-shell-v1';
 import {
   showLogin, wireLogin, showResetPasswordScreen, wireResetPasswordScreen,
 } from './ui/login.js';
@@ -21,7 +21,7 @@ function wireModalBackdrop() {
   document.body.insertAdjacentHTML('beforeend', '<div class="modal-backdrop" id="modalBackdrop" hidden><div class="modal" id="modal"></div></div>');
   document.getElementById('modalBackdrop').addEventListener('click', (e) => {
     if (e.target.id === 'modalBackdrop') {
-      import('./ui/modal.js?v=20260917-task-actions-v1').then(({ closeModal }) => closeModal());
+      import('./ui/modal.js?v=20260919-premium-shell-v1').then(({ closeModal }) => closeModal());
       import('./ui/ruleModal.js').then(({ closeRuleModal }) => closeRuleModal());
     }
   });
