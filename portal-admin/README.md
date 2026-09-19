@@ -20,6 +20,16 @@ Ela consolida três áreas:
 
 `/admin-central.html` é a única interface administrativa mantida neste overlay. A tela clássica foi removida para evitar duas superfícies com a mesma responsabilidade.
 
+## Modelo de acesso administrativo
+
+A interface administrativa segue delegação explícita e enforcement no servidor:
+
+- `admin@e3isolucoes.com.br` é o administrador-raiz padrão, configurável por `E3I_ROOT_ADMIN_EMAIL`;
+- o administrador-raiz pode conceder ou revogar `E3I_ADMIN`;
+- usuários delegados podem operar a Administração Central, mas não podem repassar a própria delegação;
+- `/admin-central.html` não é um arquivo público: o backend só entrega a tela depois de validar a sessão e a autorização;
+- ocultar ou exibir o link no frontend é apenas UX; a autorização efetiva permanece no backend.
+
 ## Segurança e contrato de ferramentas
 
 A administração de ferramentas não cria uma nova regra de autorização. Ela consome as rotas que já existem no backend do Portal:

@@ -169,6 +169,6 @@ Resend aqui adicionaria um segredo server-side sem benefício operacional.
 
 O agendamento nasce `DISABLED` para permitir o cutover governado e deve ser
 habilitado somente depois da validação manual descrita acima. Entregas têm um
-registro diário por destinatário (hash, sem e-mail) para deduplicar retries. O
-script `scripts/enviar-alertas-legacy-supabase.mjs` existe exclusivamente para
-rollback manual e não é referenciado por nenhum schedule ou workflow.
+registro diário por destinatário (hash, sem e-mail) para deduplicar retries.
+O runner legado local de alertas Supabase já foi removido do repositório; a
+notificação suportada é a Lambda AWS versionada nesta pasta.
