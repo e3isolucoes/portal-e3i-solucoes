@@ -56,17 +56,17 @@ export async function createDynamoModuleEventSource({
     async readEvents({ cursor, limit = 100 } = {}) {
       const result = await client.send(new ScanCommand({
         TableName: tableName,
-        FilterExpression: 'begins_with(SK, :eventPrefix) AND module_id = :moduleId',
+        FilterExpression: 'begins_with(SK, :eventPrefix)',
         ExpressionAttributeValues: {
           ':eventPrefix': 'EVENT#',
-          ':moduleId': moduleId,
         },
         Limit: Math.max(1, Math.min(500, Number(limit) || 100)),
         ExclusiveStartKey: decodeCursor(cursor),
       }));
 
       return {
-        items: Array.isArray(result.Items) ? result.Items : [],
+        items: (Array.isArray(result.Items) ? result.Items : [])
+          .filter((item) => !item.module_id || String(item.module_id).toLowerCase() === String(moduleId).toLowerCase()),
         cursor: encodeCursor(result.LastEvaluatedKey),
       };
     },
