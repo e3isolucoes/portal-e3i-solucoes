@@ -57,6 +57,8 @@ jobs:
             echo '- Parameter safe defaults: validated'
             echo '- User lifecycle contracts: validated'
             echo '- Tenant/admin isolation: validated in fixture tests'
+            echo '- Admin page direct access: protected in backend'
+            echo '- Root-only delegation: validated'
             echo '- Self-revoke and last-admin protection: validated'
             echo '- User sessions and forced first-login: validated'
             echo '- First-login cancel/escape/backdrop behavior: validated'
