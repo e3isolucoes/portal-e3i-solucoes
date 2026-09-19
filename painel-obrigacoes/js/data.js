@@ -557,7 +557,9 @@ export async function doChangeRole(profileId, newRole, onDone) {
   }
 
   try {
-    const updated = await updateProfile(profileId, { role: newRole });
+    const updated = isAwsAdminBackend()
+      ? { ...person, role: (await updateUserMembership(profileId, person.workspace_id || STATE.profile?.workspace_id, { role: newRole })).role }
+      : await updateProfile(profileId, { role: newRole });
     STATE.profiles = STATE.profiles.map((p) => (p.id === profileId ? updated : p));
     if (profileId === STATE.session?.id) STATE.profile = updated;
     const roleLabel = newRole === 'admin' ? 'administrador(a)' : (newRole === 'gestor' ? 'gestor(a)' : 'membro');
@@ -630,7 +632,9 @@ export async function doSetUserActive(profileId, active, onDone) {
   }
 
   try {
-    const updated = await updateProfile(profileId, { active });
+    const updated = isAwsAdminBackend()
+      ? { ...person, active: (await updateUserMembership(profileId, person.workspace_id || STATE.profile?.workspace_id, { active })).active }
+      : await updateProfile(profileId, { active });
     STATE.profiles = STATE.profiles.map((p) => (p.id === profileId ? updated : p));
     if (isSelf) {
       STATE.profile = updated;
