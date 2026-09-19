@@ -78,7 +78,6 @@ function navIcon(name) {
 }
 
 export function renderSidebarNavigation() {
-  const valCount = validationBadgeCount();
   const mineCount = STATE.obligations.filter((o) => o.responsible_id === STATE.session?.id).length;
   const item = (view, label, icon, badge = '') => '<button type="button" class="side-nav-item ' + (STATE.view === view ? 'active' : '') + '" data-action="tab" data-tab="' + view + '"' + (STATE.view === view ? ' aria-current="page"' : '') + '>'
     + '<span class="side-nav-icon">' + navIcon(icon) + '</span>'
@@ -113,11 +112,6 @@ export function renderToolbar() {
   const moduleOptions = ADMINISTRATIVE_MODULES
     .filter((module) => canAccessModule(module.key))
     .map((module) => ({ value: module.key, label: module.label }));
-  const activeModuleInfo = STATE.activeModule === 'all'
-    ? null
-    : ADMINISTRATIVE_MODULES.find((module) => module.key === STATE.activeModule && canAccessModule(module.key));
-  const moduleContextLabel = activeModuleInfo?.label || 'Todos os módulos';
-  const moduleContextColor = activeModuleInfo?.color || '#5C6672';
   const periodOptions = competenceOptions();
 
   const activeFilterCount = Object.values(STATE.filters)
