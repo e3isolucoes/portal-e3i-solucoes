@@ -61,7 +61,7 @@ function renderCard(it) {
     + `<span class="due-delta tone-${st.tone}">${deltaTxt}</span>`
   + '</div>';
   const overrideNote = override
-    ? `<div class="card-meta" style="color:var(--amber);">📌 Data ajustada manualmente (padrão seria ${fmtBR(active)})${override.reason ? ` — ${escapeHtml(override.reason)}` : ''}</div>`
+    ? `<div class="card-meta card-meta-warning">📌 Data ajustada manualmente (padrão seria ${fmtBR(active)})${override.reason ? ` — ${escapeHtml(override.reason)}` : ''}</div>`
     : '';
 
   const last = lastCompletion(ob.id);
@@ -101,10 +101,10 @@ function renderCard(it) {
   return '<details class="card obligation-card">'
     + '<summary class="obligation-card-summary">'
     + '<div class="card-top">'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-        + `<span class="badge" style="border-color:${module.color};color:${module.color};">${module.label}</span>`
-        + `${ob.activity_type === 'obrigacao_acessoria' || !ob.activity_type ? `<span class="badge" style="border-color:${cat.color};color:${cat.color};">${cat.label}</span>` : ''}`
-        + (ob.priority === 'critica' || ob.priority === 'alta' ? `<span class="badge" style="border-color:var(--red);color:var(--red);" title="Prioridade ${priorityInfo(ob.priority).label}">${ob.priority === 'critica' ? '🔥 Crítica' : '⚠ Alta'}</span>` : '')
+      + '<div class="card-tag-row">'
+        + `<span class="badge badge-dynamic" style="--badge-color:${module.color}">${module.label}</span>`
+        + `${ob.activity_type === 'obrigacao_acessoria' || !ob.activity_type ? `<span class="badge badge-dynamic" style="--badge-color:${cat.color}">${cat.label}</span>` : ''}`
+        + (ob.priority === 'critica' || ob.priority === 'alta' ? `<span class="badge badge-danger" title="Prioridade ${priorityInfo(ob.priority).label}">${ob.priority === 'critica' ? '🔥 Crítica' : '⚠ Alta'}</span>` : '')
       + '</div>'
       + `<span class="status-pill tone-${st.tone}">${st.label}</span>`
     + '</div>'
@@ -168,7 +168,7 @@ function renderCompleted(items) {
       const dueDate = fmtBR(new Date(`${completion.occurrence_date}T00:00:00`));
       const historicalCompanyName = ob.company_name || companyName(ob.company_id);
       return '<article class="completed-item">'
-        + `<span class="completed-check" aria-hidden="true">✓</span><div class="completed-main"><div class="completed-title"><strong>${escapeHtml(ob.name)}</strong><span class="badge" style="border-color:${cat.color};color:${cat.color};">${cat.label}</span></div>`
+        + `<span class="completed-check" aria-hidden="true">✓</span><div class="completed-main"><div class="completed-title"><strong>${escapeHtml(ob.name)}</strong><span class="badge badge-dynamic" style="--badge-color:${cat.color}">${cat.label}</span></div>`
         + `<p>${escapeHtml(historicalCompanyName || 'Empresa não informada')} · competência ${competenceLabel(competence)} · vencimento ${dueDate}</p></div>`
         + `<div class="completed-meta"><strong>${fmtBR(new Date(completion.done_at))}</strong><span>por ${escapeHtml(completion.done_by_name || 'Não informado')}</span>${receipt}</div>`
         + '</article>';
