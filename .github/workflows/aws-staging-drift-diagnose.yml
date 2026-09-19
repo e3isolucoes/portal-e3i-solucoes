@@ -37,16 +37,43 @@ jobs:
           echo "=== COGNITO SCHEMA ==="
           aws cognito-idp describe-user-pool             --user-pool-id "$POOL_ID"             --region "$REGION"             --query 'UserPool.SchemaAttributes[].{Name:Name,Type:AttributeDataType,Mutable:Mutable,Required:Required,StringMin:StringAttributeConstraints.MinLength,StringMax:StringAttributeConstraints.MaxLength}'             --output json
 
-          echo "=== ORIGINAL STACK TEMPLATE MARKERS ==="
+          echo "=== ORIGINAL STACK TEMPLATE ==="
           if aws cloudformation get-template             --stack-name "$STACK"             --region "$REGION"             --template-stage Original             --query 'TemplateBody'             --output text > /tmp/current-stack-template.yaml; then
-            grep -nE 'Entitlement|PreToken|Schema:|legacy_user_id|active_workspace_id|Name:' /tmp/current-stack-template.yaml || true
             echo "=== USERPOOL / PRETOKEN EXCERPT ==="
             sed -n '105,480p' /tmp/current-stack-template.yaml
             echo "=== ENTITLEMENT EXCERPT ==="
             sed -n '655,790p' /tmp/current-stack-template.yaml
+            echo "=== PARAMETERS / OUTPUTS EXCERPT ==="
+            sed -n '1,105p' /tmp/current-stack-template.yaml
+            sed -n '1450,1525p' /tmp/current-stack-template.yaml
           else
             echo "GET_TEMPLATE_NOT_ALLOWED"
           fi
 
-          echo "=== ENTITLEMENT / PRETOKEN RESOURCES ==="
-          aws cloudformation list-stack-resources             --stack-name "$STACK"             --region "$REGION"             --query "StackResourceSummaries[?contains(LogicalResourceId, 'Entitlement') || contains(LogicalResourceId, 'PreToken')].[LogicalResourceId,ResourceType,PhysicalResourceId]"             --output json || echo "LIST_STACK_RESOURCES_NOT_ALLOWED"
+          echo "=== DEPLOYED HANDLER EXCERPTS ==="
+          for FUNCTION_NAME in             "e3i-staging-painel-obrigacoes-pre-token"             "e3i-staging-painel-obrigacoes-entitlement-lifecycle"
+          do
+            echo "--- $FUNCTION_NAME ---"
+            LOCATION="$(aws lambda get-function               --function-name "$FUNCTION_NAME"               --region "$REGION"               --query 'Code.Location'               --output text 2>/dev/null || true)"
+            if [ -z "$LOCATION" ] || [ "$LOCATION" = "None" ]; then
+              echo "LAMBDA_GET_FUNCTION_NOT_ALLOWED_OR_MISSING"
+              continue
+            fi
+            ZIP="/tmp/${FUNCTION_NAME}.zip"
+            curl -fsSL "$LOCATION" -o "$ZIP"
+            unzip -l "$ZIP" | sed -n '1,100p'
+            TARGET="$(unzip -Z1 "$ZIP" | grep -E '(pre-token-generation|entitlements)\.js$' | head -n1 || true)"
+            if [ -z "$TARGET" ]; then
+              echo "HANDLER_BUNDLE_NOT_FOUND"
+              continue
+            fi
+            OUT="/tmp/$(basename "$TARGET")"
+            unzip -p "$ZIP" "$TARGET" > "$OUT"
+            START="$(grep -nE '// src/(pre-token-generation|entitlements)\.mjs' "$OUT" | head -n1 | cut -d: -f1 || true)"
+            if [ -n "$START" ]; then
+              END=$((START + 360))
+              sed -n "${START},${END}p" "$OUT"
+            else
+              tail -n 420 "$OUT"
+            fi
+          done
