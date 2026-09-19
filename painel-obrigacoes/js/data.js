@@ -597,7 +597,9 @@ export async function doChangeAdministrationAccess(profileId, granted, onDone) {
       const membership = await updateUserMembership(profileId, person.workspace_id || STATE.profile?.workspace_id, { module_grants: next });
       updated = { ...person, module_grants: membership.module_grants || next };
     } else {
-      updated = await updateProfile(profileId, { module_grants: next });
+      const operational = Array.isArray(person.module_access) ? person.module_access.filter((grant) => grant !== 'administracao') : [];
+      const moduleAccess = granted ? [...operational, 'administracao'] : operational;
+      updated = await updateProfile(profileId, { module_access: moduleAccess });
     }
     STATE.profiles = STATE.profiles.map((profile) => (profile.id === profileId ? updated : profile));
     showToast(granted ? 'Acesso à Administração liberado.' : 'Acesso à Administração removido.', 'success');
