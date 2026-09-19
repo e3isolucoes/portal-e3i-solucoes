@@ -151,7 +151,8 @@ export class AdminService {
     if (auth.userId === undefined) throw fail('Autenticação obrigatória.', 401);
     if (auth.role === 'super_admin') return;
     if (auth.workspaceId !== workspaceId || !hasAdministrationGrant(auth)) throw fail('Você não pode administrar este vínculo.', 403);
-    if ((role === 'admin' || role === 'super_admin' || grantsChanged) && !isToolAdmin(auth)) {
+    if (role === 'super_admin') throw fail('Somente super_admin pode conceder este papel.', 403);
+    if ((role === 'admin' || grantsChanged) && !isToolAdmin(auth)) {
       throw fail('Somente o Admin da Ferramenta pode conceder papel administrativo ou alterar concessões.', 403);
     }
   }
