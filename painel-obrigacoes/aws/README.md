@@ -53,8 +53,8 @@ ser reenviadas da stream/DLQ após a correção operacional.
 
 ### GitHub Actions
 
-O merge em `main` que altera `aws/**` aciona o workflow `AWS SAM Staging`.
-Ele valida testes, governança e o template SAM antes de assumir a função
+O push em `main` que altera `aws/**` aciona o workflow `AWS SAM Staging`.
+Antes de publicar em staging, ele valida testes, governança e o template SAM antes de assumir a função
 `e3i-staging-deployer` por OIDC. Não existem access keys AWS no GitHub.
 
 Pré-requisitos:
