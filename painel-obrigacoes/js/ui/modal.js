@@ -126,7 +126,7 @@ export function openModal(editId, { onSaved } = {}) {
     + `<option value="__other__" ${isOtherResponsible ? 'selected' : ''}>Outro (não está na equipe do sistema)</option>`;
   html += '<div class="field"><label>Responsável</label>'
     + `<select id="fResponsibleSelect">${responsibleOptions}</select>`
-    + `<input id="fResponsibleOther" type="text" placeholder="Nome da pessoa" value="${escapeHtml(isOtherResponsible ? ob.responsible : '')}" style="margin-top:7px;" class="${isOtherResponsible ? '' : 'hidden'}" />`
+    + `<input id="fResponsibleOther" type="text" placeholder="Nome da pessoa" value="${escapeHtml(isOtherResponsible ? ob.responsible : '')}" class="mt-8 ${isOtherResponsible ? '' : 'hidden'}" />`
     + '</div>';
 
   html += '<div class="field"><label>Frequência</label><select id="fFrequency">'
@@ -140,8 +140,8 @@ export function openModal(editId, { onSaved } = {}) {
 
   const priorityOptions = PRIORITIES.map((p) => `<option value="${p.key}" ${ob.priority === p.key ? 'selected' : ''}>${p.label}</option>`).join('');
   html += `<div class="field"><label>Prioridade</label><select id="fPriority">${priorityOptions}</select></div>`;
-  html += `<div class="field"><label><input id="fRequiresAttachment" type="checkbox" ${(ob.requires_attachment !== false) ? 'checked' : ''} style="width:auto" /> Exigir comprovante na conclusão</label></div>`;
-  html += `<div class="field" id="noMovementReceiptField"><label><input id="fRequiresAttachmentNoMovement" type="checkbox" ${(ob.requires_attachment_no_movement !== false) ? 'checked' : ''} style="width:auto" /> Exigir comprovante também quando a empresa estiver sem movimento</label></div>`;
+  html += `<div class="field"><label><input id="fRequiresAttachment" type="checkbox" ${(ob.requires_attachment !== false) ? 'checked' : ''} /> Exigir comprovante na conclusão</label></div>`;
+  html += `<div class="field" id="noMovementReceiptField"><label><input id="fRequiresAttachmentNoMovement" type="checkbox" ${(ob.requires_attachment_no_movement !== false) ? 'checked' : ''} /> Exigir comprovante também quando a empresa estiver sem movimento</label></div>`;
   html += validatorFieldHtml(
     { ...ob, requires_validation: ob.requires_validation === true },
     STATE.profiles,
