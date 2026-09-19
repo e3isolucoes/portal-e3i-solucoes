@@ -1,0 +1,117 @@
+name: Intelligence Shadow Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      obrigacoes_table:
+        description: DynamoDB table containing obrigacoes EVENT# items
+        required: true
+        type: string
+      suprimentos_table:
+        description: DynamoDB table containing suprimentos EVENT# items
+        required: true
+        type: string
+      enable_schedule:
+        description: Enable 5-minute shadow polling after initial validation
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  validate-and-deploy-shadow:
+    runs-on: ubuntu-latest
+    environment: intelligence-staging
+    env:
+      AWS_REGION: sa-east-1
+      E3I_ENVIRONMENT: staging
+      E3I_INTELLIGENCE_ENABLED: 'true'
+      E3I_INTELLIGENCE_SHADOW_MODE: 'true'
+    defaults:
+      run:
+        working-directory: e3i-intelligence
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate shadow contracts and failure isolation
+        run: npm test
+
+      - name: Validate isolated staging template
+        run: sam validate --lint --template-file aws/shadow-staging.yaml
+
+      - name: Authenticate to isolated AWS staging
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
+          role-session-name: github-e3i-intelligence-shadow
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: '181215701228'
+          unset-current-credentials: true
+
+      - name: Build shadow Lambda package
+        run: sam build --template-file aws/shadow-staging.yaml
+
+      - name: Deploy isolated shadow staging
+        run: |
+          sam deploy \
+            --stack-name e3i-intelligence-shadow-staging \
+            --resolve-s3 \
+            --region "$AWS_REGION" \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              ObrigacoesTableName="${{ inputs.obrigacoes_table }}" \
+              SuprimentosTableName="${{ inputs.suprimentos_table }}" \
+              ScheduleState="${{ inputs.enable_schedule && 'ENABLED' || 'DISABLED' }}"
+
+      - name: Run health check before enabling recurring polling
+        shell: bash
+        run: |
+          health_function="$(aws cloudformation describe-stacks \
+            --stack-name e3i-intelligence-shadow-staging \
+            --region "$AWS_REGION" \
+            --query "Stacks[0].Outputs[?OutputKey=='ShadowHealthFunctionName'].OutputValue | [0]" \
+            --output text)"
+          aws lambda invoke \
+            --function-name "$health_function" \
+            --region "$AWS_REGION" \
+            /tmp/health.json >/tmp/invoke.json
+          cat /tmp/health.json
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));if(p.statusCode!==200)process.exit(1)"
+
+      - name: Run one shadow ingestion pass
+        shell: bash
+        run: |
+          consumer_function="$(aws cloudformation describe-stacks \
+            --stack-name e3i-intelligence-shadow-staging \
+            --region "$AWS_REGION" \
+            --query "Stacks[0].Outputs[?OutputKey=='ShadowConsumerFunctionName'].OutputValue | [0]" \
+            --output text)"
+          aws lambda invoke \
+            --function-name "$consumer_function" \
+            --region "$AWS_REGION" \
+            /tmp/shadow-result.json >/tmp/invoke.json
+          cat /tmp/shadow-result.json
+
+      - name: Publish staging summary
+        run: |
+          {
+            echo '### E3I Intelligence shadow staging'
+            echo '- Feature flag: ON only in intelligence-staging'
+            echo '- Production default: OFF'
+            echo '- Source access: DynamoDB DescribeTable + Scan only'
+            echo '- Source writes: none'
+            echo '- Event Ledger / Mapping Store: isolated staging tables'
+            echo "- Recurring schedule requested: ${{ inputs.enable_schedule }}"
+          } >> "$GITHUB_STEP_SUMMARY"
