@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, isManager, isSuperUser, canAccessModule, activeOccurrences,
+  STATE, isAdmin, isManager, isSuperUser, hasAdministrationAccess, canAccessModule, activeOccurrences,
   competenceForOccurrence, competenceKey, competenceLabel,
 } from '../state.js';
 import { CATEGORIES, ADMINISTRATIVE_MODULES } from '../constants.js';
@@ -109,8 +109,8 @@ export function renderToolbar() {
     html += tab('validacoes', `Validações${selo}`);
   }
 
+  if (hasAdministrationAccess() && hasModuleGrant(STATE.profile, 'administracao')) html += tab('manage', 'Administração');
   if (isManager()) {
-    if (hasModuleGrant(STATE.profile, 'administracao')) html += tab('manage', 'Gerenciar');
     if (hasModuleGrant(STATE.profile, 'relatorios')) html += tab('reports', 'Relatórios');
     if (hasModuleGrant(STATE.profile, 'dashboard')) html += tab('dashboard', 'Central de Gestão');
   }
