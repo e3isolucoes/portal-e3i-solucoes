@@ -61,34 +61,34 @@ function renderNotificationBell() {
   let listHtml = '';
 
   if (rejected) {
-    listHtml += '<div class="dd-item" data-action="tab" data-tab="validacoes" style="white-space:normal;">'
-      + `<span class="status-pill tone-red" style="margin-right:6px;">Devolvida</span>`
+    listHtml += '<div class="dd-item dd-item-wrap" data-action="tab" data-tab="validacoes">'
+      + `<span class="status-pill tone-red dd-status-leading">Devolvida</span>`
       + `${rejected} tarefa(s) voltaram para você corrigir`
       + '</div>';
   }
   if (pendingValidation) {
     listHtml += '<div class="dd-item" data-action="tab" data-tab="validacoes" style="white-space:normal;">'
-      + `<span class="status-pill tone-amber" style="margin-right:6px;">Validar</span>`
+      + `<span class="status-pill tone-amber dd-status-leading">Validar</span>`
       + `${pendingValidation} tarefa(s) aguardando sua validação`
       + '</div>';
   }
 
   listHtml += items.length
     ? items.slice(0, 8).map(({ ob, status }) => (
-      '<div class="dd-item" style="white-space:normal;cursor:default;">'
-        + `<span class="status-pill tone-${status.tone}" style="margin-right:6px;">${escapeHtml(status.label)}</span>`
+      '<div class="dd-item dd-item-static">'
+        + `<span class="status-pill tone-${status.tone} dd-status-leading">${escapeHtml(status.label)}</span>`
         + `${escapeHtml(ob.name)} — ${deltaLabel(status.diffDays)}`
       + '</div>'
     )).join('')
-    : (count ? '' : '<div class="dd-item" style="white-space:normal;cursor:default;">Nenhuma pendência sua atrasada ou vencendo em breve.</div>');
+    : (count ? '' : '<div class="dd-item dd-item-static">Nenhuma pendência sua atrasada ou vencendo em breve.</div>');
 
   return '<div class="dd" data-dd-root="notifications">'
     + '<button type="button" class="dd-btn" data-action="dd-toggle" data-dd="notifications" aria-label="Notificações" title="Suas obrigações atrasadas, vencendo em breve ou aguardando validação">'
       + `🔔${count ? ` <span class="status-pill tone-red">${count}</span>` : ''}`
     + '</button>'
-    + '<div class="dd-panel hidden" data-dd-panel="notifications" style="left:auto;right:0;">'
+    + '<div class="dd-panel dd-panel-right hidden" data-dd-panel="notifications">'
       + listHtml
-      + (items.length ? '<div class="dd-item" data-action="tab" data-tab="mine" style="font-weight:700;text-align:center;">Ver Minhas obrigações →</div>' : '')
+      + (items.length ? '<div class="dd-item dd-item-cta" data-action="tab" data-tab="mine">Ver Minhas obrigações →</div>' : '')
     + '</div>'
   + '</div>';
 }
