@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { STATE } from '../js/state.js';
-import { renderToolbar } from '../js/ui/toolbar.js';
+import { renderToolbar, renderSidebarNavigation } from '../js/ui/toolbar.js';
 
 function resetState() {
   STATE.profile = { role: 'membro', active: true };
@@ -18,22 +18,22 @@ function resetState() {
   STATE.view = 'board';
 }
 
-test('toolbar identifica navegação atual e oferece filtros acessíveis', () => {
+test('sidebar identifica a navegação atual e toolbar fica dedicada a filtros', () => {
   resetState();
+  const nav = renderSidebarNavigation();
   const html = renderToolbar();
 
-  assert.match(html, /<nav class="tabs" aria-label="Áreas do painel">/);
-  assert.match(html, /data-tab="board" aria-current="page"/);
+  assert.match(nav, /<nav class="side-nav" aria-label="Navegação principal">/);
+  assert.match(nav, /data-tab="board" aria-current="page"/);
+  assert.doesNotMatch(html, /class="tabs"/);
+  assert.match(html, /class="toolbar workspace-filters"/);
   assert.match(html, /aria-haspopup="listbox" aria-expanded="false"/);
   assert.match(html, /role="option" aria-selected="true"/);
-  assert.match(html, /aria-label="Módulo selecionado: Todos os módulos">Módulo: Todos os módulos<\/span>/);
-  assert.doesNotMatch(html, /data-action="module"/);
   assert.match(html, /data-action="module-filter"[^>]*aria-label="Todos os módulos"/);
   assert.match(html, /data-action="filter-select" data-filter="competence"[^>]*aria-label="Todas as competências"/);
   assert.match(html, /data-action="clear-filters"[^>]*disabled[^>]*>Remover filtros/);
   assert.match(html, /data-dd="status" data-value="today"[^>]*>Vence hoje/);
-  assert.doesNotMatch(html, /Todos os vencimentos/);
-  assert.match(html, /data-value="missing"[^>]*>Sem comprovante/);
+  assert.match(html, /data-action="new">\+ Nova atividade/);
 });
 
 test('toolbar identifica Vence hoje como status selecionado', () => {
@@ -68,7 +68,7 @@ test('toolbar contabiliza o filtro de comprovante', () => {
   assert.match(html, />Remover filtros <span>1<\/span>/);
 });
 
-test('toolbar mostra somente o módulo selecionado e contabiliza o filtro', () => {
+test('toolbar mantém módulo selecionado e contabiliza o filtro', () => {
   resetState();
   STATE.activeModule = 'fiscal';
   STATE.filters.competence = '2026-08';
@@ -76,7 +76,6 @@ test('toolbar mostra somente o módulo selecionado e contabiliza o filtro', () =
 
   const html = renderToolbar();
 
-  assert.match(html, /aria-label="Módulo selecionado: Fiscal">Módulo: Fiscal<\/span>/);
   assert.doesNotMatch(html, /data-action="module"/);
   assert.match(html, /data-action="module-filter"[^>]*>[\s\S]*<option value="fiscal" selected>Fiscal<\/option>/);
   assert.match(html, />Remover filtros <span>2<\/span>/);
