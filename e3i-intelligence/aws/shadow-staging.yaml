@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: E3I Intelligence isolated shadow ingestion staging stack
+
+Parameters:
+  ObrigacoesTableName:
+    Type: String
+    MinLength: 1
+  SuprimentosTableName:
+    Type: String
+    MinLength: 1
+  ScheduleState:
+    Type: String
+    Default: DISABLED
+    AllowedValues: [ENABLED, DISABLED]
+
+Conditions:
+  EnableSchedule: !Equals [!Ref ScheduleState, ENABLED]
+
+Resources:
+  EventLedger:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: e3i:service
+          Value: intelligence
+        - Key: e3i:environment
+          Value: staging
+        - Key: e3i:mode
+          Value: shadow
+
+  MappingStore:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: e3i:service
+          Value: intelligence
+        - Key: e3i:environment
+          Value: staging
+        - Key: e3i:mode
+          Value: shadow
+
+  ShadowConsumerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ShadowSourceReadOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadOperationalEventsOnly
+                Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ObrigacoesTableName}
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SuprimentosTableName}
+              - Sid: WriteIntelligenceStoresOnly
+                Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                Resource:
+                  - !GetAtt EventLedger.Arn
+                  - !GetAtt MappingStore.Arn
+              - Sid: WriteLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  ShadowConsumerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: e3i-intelligence-staging-shadow-consumer
+      Runtime: nodejs22.x
+      Handler: src/shadow-runner.handler
+      CodeUri: ../
+      MemorySize: 256
+      Timeout: 60
+      Role: !GetAtt ShadowConsumerRole.Arn
+      Environment:
+        Variables:
+          E3I_ENVIRONMENT: staging
+          E3I_INTELLIGENCE_ENABLED: 'true'
+          E3I_INTELLIGENCE_SHADOW_MODE: 'true'
+          E3I_OBRIGACOES_EVENT_TABLE: !Ref ObrigacoesTableName
+          E3I_SUPRIMENTOS_EVENT_TABLE: !Ref SuprimentosTableName
+          E3I_INTELLIGENCE_EVENT_LEDGER_TABLE: !Ref EventLedger
+          E3I_INTELLIGENCE_MAPPING_STORE_TABLE: !Ref MappingStore
+          E3I_INTELLIGENCE_PROCESSING_PURPOSE_ID: operational-shadow-mapping-v1
+          E3I_INTELLIGENCE_RETENTION_CLASS: ANALYTICS_2Y
+      Events:
+        Poll:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Enabled: !If [EnableSchedule, true, false]
+
+  ShadowHealthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: HealthDescribeOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: dynamodb:DescribeTable
+                Resource:
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ObrigacoesTableName}
+                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SuprimentosTableName}
+                  - !GetAtt EventLedger.Arn
+                  - !GetAtt MappingStore.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  ShadowHealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: e3i-intelligence-staging-shadow-health
+      Runtime: nodejs22.x
+      Handler: src/shadow-health-handler.handler
+      CodeUri: ../
+      MemorySize: 128
+      Timeout: 15
+      Role: !GetAtt ShadowHealthRole.Arn
+      Environment:
+        Variables:
+          E3I_OBRIGACOES_EVENT_TABLE: !Ref ObrigacoesTableName
+          E3I_SUPRIMENTOS_EVENT_TABLE: !Ref SuprimentosTableName
+          E3I_INTELLIGENCE_EVENT_LEDGER_TABLE: !Ref EventLedger
+          E3I_INTELLIGENCE_MAPPING_STORE_TABLE: !Ref MappingStore
+
+Outputs:
+  EventLedgerTableName:
+    Value: !Ref EventLedger
+  MappingStoreTableName:
+    Value: !Ref MappingStore
+  ShadowConsumerFunctionName:
+    Value: !Ref ShadowConsumerFunction
+  ShadowHealthFunctionName:
+    Value: !Ref ShadowHealthFunction

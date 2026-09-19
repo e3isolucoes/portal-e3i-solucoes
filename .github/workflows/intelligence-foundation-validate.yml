@@ -27,12 +27,18 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Validate contracts and non-breaking guardrails
         run: npm test
-      - name: Confirm no deployment automation exists in the foundation
+      - name: Confirm production remains non-deploying by default
         run: |
-          node -e "const m=require('./foundation-manifest.json'); if(m.deployment.automatic!==false) process.exit(1)"
+          node -e "const m=require('./foundation-manifest.json'); if(m.deployment.automatic!==false||m.deployment.productionFeatureEnabledByDefault!==false) process.exit(1)"
           test ! -e aws/template.yaml
+      - name: Validate isolated shadow staging template
+        run: sam validate --lint --template-file aws/shadow-staging.yaml
       - name: Publish validation summary
         run: |
           {
@@ -42,4 +48,5 @@ jobs:
             echo '- Ingestion default: OFF'
             echo '- Automatic deploy: disabled'
             echo '- Existing tools dependency: none'
+            echo '- Shadow staging: manual, read-only sources, staging-only'
           } >> "$GITHUB_STEP_SUMMARY"
