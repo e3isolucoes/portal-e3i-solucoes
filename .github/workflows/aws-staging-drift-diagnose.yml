@@ -40,6 +40,10 @@ jobs:
           echo "=== ORIGINAL STACK TEMPLATE MARKERS ==="
           if aws cloudformation get-template             --stack-name "$STACK"             --region "$REGION"             --template-stage Original             --query 'TemplateBody'             --output text > /tmp/current-stack-template.yaml; then
             grep -nE 'Entitlement|PreToken|Schema:|legacy_user_id|active_workspace_id|Name:' /tmp/current-stack-template.yaml || true
+            echo "=== USERPOOL / PRETOKEN EXCERPT ==="
+            sed -n '105,480p' /tmp/current-stack-template.yaml
+            echo "=== ENTITLEMENT EXCERPT ==="
+            sed -n '655,790p' /tmp/current-stack-template.yaml
           else
             echo "GET_TEMPLATE_NOT_ALLOWED"
           fi
