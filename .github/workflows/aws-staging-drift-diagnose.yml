@@ -37,9 +37,12 @@ jobs:
           echo "=== COGNITO SCHEMA ==="
           aws cognito-idp describe-user-pool             --user-pool-id "$POOL_ID"             --region "$REGION"             --query 'UserPool.SchemaAttributes[].{Name:Name,Type:AttributeDataType,Mutable:Mutable,Required:Required,StringMin:StringAttributeConstraints.MinLength,StringMax:StringAttributeConstraints.MaxLength}'             --output json
 
-          echo "=== ENTITLEMENT / PRETOKEN RESOURCES ==="
-          aws cloudformation list-stack-resources             --stack-name "$STACK"             --region "$REGION"             --query "StackResourceSummaries[?contains(LogicalResourceId, 'Entitlement') || contains(LogicalResourceId, 'PreToken')].[LogicalResourceId,ResourceType,PhysicalResourceId]"             --output json
-
           echo "=== ORIGINAL STACK TEMPLATE MARKERS ==="
-          aws cloudformation get-template             --stack-name "$STACK"             --region "$REGION"             --template-stage Original             --query 'TemplateBody'             --output text > /tmp/current-stack-template.yaml
-          grep -nE 'Entitlement|PreToken|Schema:|legacy_user_id|Name:' /tmp/current-stack-template.yaml || true
+          if aws cloudformation get-template             --stack-name "$STACK"             --region "$REGION"             --template-stage Original             --query 'TemplateBody'             --output text > /tmp/current-stack-template.yaml; then
+            grep -nE 'Entitlement|PreToken|Schema:|legacy_user_id|active_workspace_id|Name:' /tmp/current-stack-template.yaml || true
+          else
+            echo "GET_TEMPLATE_NOT_ALLOWED"
+          fi
+
+          echo "=== ENTITLEMENT / PRETOKEN RESOURCES ==="
+          aws cloudformation list-stack-resources             --stack-name "$STACK"             --region "$REGION"             --query "StackResourceSummaries[?contains(LogicalResourceId, 'Entitlement') || contains(LogicalResourceId, 'PreToken')].[LogicalResourceId,ResourceType,PhysicalResourceId]"             --output json || echo "LIST_STACK_RESOURCES_NOT_ALLOWED"
