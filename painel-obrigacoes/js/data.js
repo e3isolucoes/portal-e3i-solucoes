@@ -1,5 +1,5 @@
 import {
-  STATE, isAdmin, isSuperUser, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
+  STATE, isAdmin, isSuperUser, hasAdministrationAccess, holidaysDateSet, completionsIndex, overrideForOccurrence, rulesForRegime, taxRegimeName,
 } from './state.js';
 import { fetchObligations, createObligation, updateObligation, deleteObligation as apiDeleteObligation, createObligationsBulk } from './api/obligations.js?v=20260908-csp-wasm-v2';
 import { fetchCompletions, markCompletion, deleteCompletion } from './api/completions.js';
@@ -571,7 +571,7 @@ export async function doChangeRole(profileId, newRole, onDone) {
 }
 
 export async function doChangeModuleAccess(profileId, moduleAccess, onDone) {
-  if (!isAdmin()) return;
+  if (!hasAdministrationAccess()) return;
   try {
     const updated = await updateProfile(profileId, { module_access: moduleAccess });
     STATE.profiles = STATE.profiles.map((profile) => (profile.id === profileId ? updated : profile));
@@ -583,11 +583,35 @@ export async function doChangeModuleAccess(profileId, moduleAccess, onDone) {
   } finally { onDone?.(); }
 }
 
+export async function doChangeAdministrationAccess(profileId, granted, onDone) {
+  if (!isAdmin()) return;
+  const person = STATE.profiles.find((profile) => profile.id === profileId);
+  if (!person || profileId === STATE.session?.id) return;
+  const current = Array.isArray(person.module_grants) ? person.module_grants : [];
+  const next = granted
+    ? [...new Set([...current, 'administracao'])]
+    : current.filter((grant) => grant !== 'administracao');
+  try {
+    let updated = person;
+    if (isAwsAdminBackend()) {
+      const membership = await updateUserMembership(profileId, person.workspace_id || STATE.profile?.workspace_id, { module_grants: next });
+      updated = { ...person, module_grants: membership.module_grants || next };
+    } else {
+      updated = await updateProfile(profileId, { module_grants: next });
+    }
+    STATE.profiles = STATE.profiles.map((profile) => (profile.id === profileId ? updated : profile));
+    showToast(granted ? 'Acesso à Administração liberado.' : 'Acesso à Administração removido.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Não foi possível alterar o acesso à Administração.', 'error');
+  } finally { onDone?.(); }
+}
+
 // Revoga ou reativa o acesso de alguém (profiles.active) — não apaga a
 // conta nem o perfil, só bloqueia a entrada (ver checagem em js/app.js e a
 // função is_admin() no banco, que já ignora papel de quem está revogado).
 export async function doSetUserActive(profileId, active, onDone) {
-  if (!isAdmin()) return;
+  if (!hasAdministrationAccess()) return;
   const person = STATE.profiles.find((p) => p.id === profileId);
   if (!person) return;
 
@@ -628,7 +652,7 @@ export async function doSetUserActive(profileId, active, onDone) {
 // service_role key, então isso é o que um admin tem à disposição: a
 // pessoa recebe o link e escolhe a senha nova ela mesma.
 export async function doSendPasswordReset(profileId, onDone) {
-  if (!isAdmin()) return;
+  if (!hasAdministrationAccess()) return;
   const person = STATE.profiles.find((p) => p.id === profileId);
   if (!person) return;
 
@@ -998,11 +1022,12 @@ export async function doApplyRuleToCompanies(ruleId, onDone) {
 // "reativar" (junto com o botão de revogar, ver doSetUserActive acima). Se
 // o e-mail não existir ainda, cai no fluxo de criação de conta normal.
 export async function doCreateUser(formData, onDone) {
-  if (!isAdmin()) return;
+  if (!hasAdministrationAccess()) return;
   const email = (formData.email || '').trim();
   const displayName = (formData.displayName || '').trim();
   const password = formData.password || '';
-  const role = ['admin', 'gestor'].includes(formData.role) ? formData.role : 'membro';
+  const requestedRole = ['admin', 'gestor'].includes(formData.role) ? formData.role : 'membro';
+  const role = !isAdmin() && requestedRole === 'admin' ? 'gestor' : requestedRole;
   const workspaceId = isSuperUser() ? (formData.workspaceId || null) : STATE.profile?.workspace_id;
 
   if (!email || !displayName) { showToast('Informe nome e e-mail.', 'error'); return; }
