@@ -19,8 +19,11 @@ export function hasModuleGrant(profile, grant) {
   if (!profile || profile.active === false) return false;
   if (BASELINE_MODULE_GRANTS.has(grant)) return true;
   if (['admin', 'super_admin'].includes(String(profile.role || '').toLowerCase())) return true;
-  return (Array.isArray(profile.module_grants) && profile.module_grants.includes(grant))
-    || (Array.isArray(profile.module_access) && profile.module_access.includes(grant));
+  if (grant === 'administracao') {
+    return (Array.isArray(profile.module_grants) && profile.module_grants.includes(grant))
+      || (Array.isArray(profile.module_access) && profile.module_access.includes(grant));
+  }
+  return !Array.isArray(profile.module_grants) || profile.module_grants.includes(grant);
 }
 
 export class ModuleRegistry {
@@ -52,18 +55,14 @@ export class ModuleRegistry {
 }
 
 export function moduleContext({ state, permissions }) {
-  const configuredGrants = [
-    ...(Array.isArray(state.profile?.module_grants) ? state.profile.module_grants : []),
-    ...(Array.isArray(state.profile?.module_access) ? state.profile.module_access : []),
-  ];
+  const configuredGrants = state.profile?.module_grants;
   const activeSession = Boolean(state.session && state.profile && state.profile.active !== false);
-  const administrator = ['admin', 'super_admin'].includes(String(state.profile?.role || '').toLowerCase());
-  const moduleGrants = administrator
-    ? null
-    : new Set([
+  const moduleGrants = Array.isArray(configuredGrants)
+    ? new Set([
         ...configuredGrants,
         ...(activeSession ? BASELINE_MODULE_GRANTS : []),
-      ]);
+      ])
+    : null;
 
   return Object.freeze({
     state,
