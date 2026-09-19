@@ -92,6 +92,10 @@ Resources:
     Properties:
       UserPoolName: !Sub e3i-${Environment}-${ToolId}
       UsernameAttributes: [email]
+      # Cognito não permite remover/alterar atributos customizados depois de
+      # criados. active_workspace_id pertence ao modelo legado de seleção de
+      # workspace e permanece declarado apenas para compatibilidade do pool
+      # existente; a autorização atual usa memberships no DynamoDB.
       Schema:
         - Name: legacy_user_id
           AttributeDataType: String
@@ -99,6 +103,12 @@ Resources:
           StringAttributeConstraints:
             MinLength: '1'
             MaxLength: '64'
+        - Name: active_workspace_id
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '80'
       AutoVerifiedAttributes: [email]
       AccountRecoverySetting:
         RecoveryMechanisms:
