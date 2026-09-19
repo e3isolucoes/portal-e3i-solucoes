@@ -6,14 +6,31 @@ Fundação isolada para discovery, mapeamento, enriquecimento humano, Data Scien
 
 Esta pasta não é dependência de nenhuma ferramenta operacional existente. Portal, autenticação, SSO, Painel de Obrigações, CRUDs e demais ferramentas devem continuar operando mesmo quando o E3I Intelligence estiver desabilitado ou indisponível.
 
-Na Sprint 1:
+Na fundação:
 
-- `E3I_INTELLIGENCE_ENABLED` nasce desligado;
+- `E3I_INTELLIGENCE_ENABLED` continua desligado por padrão;
+- produção continua com o recurso desligado;
 - não existe integração de escrita nas ferramentas atuais;
 - não existe agente com permissão de alteração;
-- a ingestão nasce desabilitada;
-- nenhuma tabela ou endpoint atual é modificado;
-- o workflow desta pasta apenas valida; não faz deploy.
+- nenhuma tabela ou endpoint operacional é modificado pelo Intelligence;
+- a falha de telemetria nunca pode interromper a operação.
+
+## Shadow ingestion — staging isolado
+
+O primeiro consumidor foi adicionado em modo **read-only/shadow** para eventos `EVENT#` dos módulos `obrigacoes` e `suprimentos`.
+
+Regras obrigatórias:
+
+- habilitação somente com `E3I_ENVIRONMENT=staging`;
+- `E3I_INTELLIGENCE_ENABLED=true` somente no ambiente `intelligence-staging`;
+- `E3I_INTELLIGENCE_SHADOW_MODE=true` é obrigatório;
+- a role do consumidor possui apenas `dynamodb:DescribeTable` e `dynamodb:Scan` nas tabelas-fonte;
+- nenhuma operação `PutItem`, `UpdateItem` ou `DeleteItem` é permitida nas tabelas dos módulos;
+- gravações são permitidas exclusivamente nas tabelas isoladas `EventLedger` e `MappingStore`;
+- payload operacional bruto não é copiado: o consumidor minimiza os dados e traduz somente metadados necessários para `event-v1`;
+- indisponibilidade do Intelligence resulta em telemetria degradada, sem derrubar `obrigacoes` ou `suprimentos`.
+
+O deploy de staging é **manual** em `.github/workflows/intelligence-shadow-staging.yml`. O schedule nasce `DISABLED` e deve ser habilitado somente depois do health check e de uma execução shadow manual bem-sucedidos.
 
 ## Três formas de iniciar um mapeamento
 
@@ -57,6 +74,17 @@ cd e3i-intelligence
 npm test
 ```
 
+## Consumidor shadow
+
+Arquivos principais:
+
+- `src/shadow-event-consumer.mjs` — tradução `EVENT#` → `event-v1`, idempotência e projeção shadow;
+- `src/dynamodb-shadow-adapter.mjs` — leitura DynamoDB e escrita somente nos stores de Intelligence;
+- `src/shadow-health.mjs` — health check de isolamento de falha;
+- `src/shadow-runner.mjs` — execução do consumidor;
+- `aws/shadow-staging.yaml` — stack isolada de staging;
+- `.github/workflows/intelligence-shadow-staging.yml` — deploy manual de staging.
+
 ## Próxima etapa
 
-Após revisão e validação desta fundação, a próxima PR deve implementar o Mapping Core autenticado e tenant-scoped em infraestrutura isolada. Só depois conectaremos o primeiro evento de uma ferramenta existente em shadow mode, com falha de telemetria incapaz de afetar a operação principal.
+Após validar o primeiro lote real em staging, comparar Event Ledger e Mapping Store com os eventos-fonte, medir volume/custo de leitura e somente então decidir sobre polling recorrente ou migração para streams/event bus. Produção permanece desligada até uma decisão explícita posterior.
