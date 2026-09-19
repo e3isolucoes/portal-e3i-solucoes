@@ -148,7 +148,8 @@ export class InMemoryShadowMappingStore {
     const key = `${event.tenantId}::${mappingId}`;
     const current = this.#items.get(key);
     const now = event.occurredAt;
-    const count = Number(current?.shadowEventCount || 0) + 1;
+    const currentCount = current?.facts?.find((fact) => fact.key === 'shadow_event_count')?.value;
+    const count = Number(currentCount || 0) + 1;
     const firstSeenAt = current?.createdAt || now;
 
     const mapping = {
@@ -169,8 +170,7 @@ export class InMemoryShadowMappingStore {
       evidenceRefs: [],
       createdByActorId: 'shadow-consumer',
       createdAt: firstSeenAt,
-      updatedAt: now,
-      shadowEventCount: count,
+      updatedAt: now
     };
 
     this.#items.set(key, clone(mapping));
