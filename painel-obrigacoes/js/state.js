@@ -81,8 +81,8 @@ export function canWriteObligations() {
 }
 
 export function canAccessModule(moduleKey) {
-  if (isAdmin()) return true;
-  return Array.isArray(STATE.profile?.module_access) && STATE.profile.module_access.includes(moduleKey);
+  if (isAdmin() || STATE.profile?.module_access == null) return true;
+  return Array.isArray(STATE.profile.module_access) && STATE.profile.module_access.includes(moduleKey);
 }
 
 // A competência é o período de movimento/apuração e não o vencimento.
