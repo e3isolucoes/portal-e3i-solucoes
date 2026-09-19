@@ -3,6 +3,8 @@ const e3iAdminCentralFs = require('fs');
 const e3iAdminCentralPath = require('path');
 const E3I_ADMIN_CENTRAL_SETTINGS_FILE = process.env.E3I_ADMIN_SETTINGS_FILE || '/app/data/e3i_admin_settings.json';
 const E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE = process.env.E3I_PORTAL_DATA_FILE || '/app/data/bigquery_dataset.json';
+const E3I_ADMIN_CENTRAL_PRIVATE_HTML = process.env.E3I_ADMIN_CENTRAL_PRIVATE_HTML || '/app/private/admin-central.html';
+const E3I_ADMIN_CENTRAL_ROOT_EMAIL = String(process.env.E3I_ROOT_ADMIN_EMAIL || 'admin@e3isolucoes.com.br').trim().toLowerCase();
 
 const E3I_ADMIN_CENTRAL_DEFAULTS = Object.freeze({
   intelligence: Object.freeze({
@@ -108,26 +110,22 @@ function e3iAdminCentralFindUser(authResult, dataset) {
   }) || null;
 }
 
+
 function e3iAdminCentralRole(authResult, dataset) {
   const candidates = e3iAdminCentralAuthCandidates(authResult);
-  const directRoles = [
-    authResult?.role,
-    authResult?.portalRole,
-    authResult?.session?.role,
-    candidates.user?.role,
-    candidates.user?.portalRole,
-  ];
-  const directRoleArrays = [authResult?.roles, candidates.user?.roles, authResult?.session?.roles]
-    .filter(Array.isArray)
-    .flat();
-  if ([...directRoles, ...directRoleArrays].some((role) => String(role || '').toUpperCase() === 'E3I_ADMIN')) {
+  const storedUser = e3iAdminCentralFindUser(authResult, dataset);
+  if (candidates.emails.includes(E3I_ADMIN_CENTRAL_ROOT_EMAIL) ||
+      String(storedUser?.email || '').trim().toLowerCase() === E3I_ADMIN_CENTRAL_ROOT_EMAIL) {
     return 'E3I_ADMIN';
   }
-  const storedUser = e3iAdminCentralFindUser(authResult, dataset);
-  const storedRoles = [storedUser?.role, storedUser?.portalRole, ...(Array.isArray(storedUser?.roles) ? storedUser.roles : [])];
-  return storedRoles.some((role) => String(role || '').toUpperCase() === 'E3I_ADMIN') ? 'E3I_ADMIN' : '';
+  if (!storedUser || String(storedUser?.status || 'ACTIVE').toUpperCase() !== 'ACTIVE') return '';
+  const storedRoles = [storedUser?.role, storedUser?.systemRole, storedUser?.portalRole, ...(Array.isArray(storedUser?.roles) ? storedUser.roles : [])];
+  const delegatedBy = String(storedUser?.adminCentralGrantedBy || '').trim().toLowerCase();
+  return delegatedBy === E3I_ADMIN_CENTRAL_ROOT_EMAIL &&
+    storedRoles.some((role) => String(role || '').toUpperCase() === 'E3I_ADMIN')
+    ? 'E3I_ADMIN'
+    : '';
 }
-
 function e3iAdminCentralActiveOrganization(authResult, dataset) {
   const user = authResult?.user || authResult?.session?.user || authResult?.principal || {};
   const direct = [
@@ -182,7 +180,14 @@ function e3iAdminCentralRequireAdmin(req, res) {
   const actorId = String(
     authResult?.userId || authResult?.actorId || candidates.user?.id || storedUser?.id || storedUser?.userId || 'admin',
   ).slice(0, 160);
-  return { authResult, organizationId: activeOrganizationId, actorId };
+  const actorEmail = String(authResult?.email || candidates.user?.email || storedUser?.email || '').trim().toLowerCase();
+  return {
+    authResult,
+    organizationId: activeOrganizationId,
+    actorId,
+    actorEmail,
+    isRoot: actorEmail === E3I_ADMIN_CENTRAL_ROOT_EMAIL,
+  };
 }
 
 function e3iAdminCentralValidateSettings(candidate) {
@@ -288,6 +293,32 @@ function e3iAdminCentralChangedKeys(previous, next) {
   }
   return keys;
 }
+
+app.get('/api/admin/access', (req, res) => {
+  const authResult = validateSession(req, res);
+  if (!authResult) return;
+  let dataset = {};
+  try { dataset = e3iAdminCentralReadJson(E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE, {}); } catch (_) {}
+  const authorized = e3iAdminCentralRole(authResult, dataset) === 'E3I_ADMIN';
+  const candidates = e3iAdminCentralAuthCandidates(authResult);
+  const storedUser = e3iAdminCentralFindUser(authResult, dataset);
+  const actorEmail = String(authResult?.email || candidates.user?.email || storedUser?.email || '').trim().toLowerCase();
+  res.set('Cache-Control', 'no-store');
+  return res.json({ authorized, isRoot: actorEmail === E3I_ADMIN_CENTRAL_ROOT_EMAIL });
+});
+
+app.get('/admin-central.html', (req, res) => {
+  const authResult = validateSession(req, res);
+  if (!authResult) return;
+  let dataset = {};
+  try { dataset = e3iAdminCentralReadJson(E3I_ADMIN_CENTRAL_PORTAL_DATA_FILE, {}); }
+  catch (_) { return res.status(500).send('Não foi possível validar o acesso administrativo.'); }
+  if (e3iAdminCentralRole(authResult, dataset) !== 'E3I_ADMIN') {
+    return res.status(403).send('Acesso administrativo não autorizado.');
+  }
+  res.set('Cache-Control', 'no-store');
+  return res.sendFile(E3I_ADMIN_CENTRAL_PRIVATE_HTML);
+});
 
 app.get('/api/admin/organizations/:organizationId/central-settings', (req, res) => {
   try {
