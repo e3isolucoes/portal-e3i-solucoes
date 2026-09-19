@@ -28,11 +28,13 @@ test('normaliza gestor independentemente de caixa e idioma canônico', () => {
   assert.equal(canonicalRole('manager'), 'manager');
 });
 
-test('obrigações são capacidade operacional básica e demais módulos continuam protegidos', () => {
-  assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: null }, 'obrigacoes'));
-  assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: [] }, 'obrigacoes'));
-  assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: ['relatorios'] }, 'obrigacoes'));
-  assert.doesNotThrow(() => requireModuleGrant({ moduleGrants: ['obrigacoes'] }, 'obrigacoes'));
-  assert.throws(() => requireModuleGrant({ moduleGrants: ['obrigacoes'] }, 'administracao'), /não concedido/i);
-  assert.throws(() => requireModuleGrant({ moduleGrants: [] }, 'relatorios'), /não concedido/i);
+test('obrigações são capacidade básica e Administração exige grant explícito fora do papel admin', () => {
+  assert.doesNotThrow(() => requireModuleGrant({ role: 'member', moduleGrants: null }, 'obrigacoes'));
+  assert.doesNotThrow(() => requireModuleGrant({ role: 'manager', moduleGrants: [] }, 'obrigacoes'));
+  assert.throws(() => requireModuleGrant({ role: 'manager', moduleGrants: null }, 'administracao'), /não concedido/i);
+  assert.throws(() => requireModuleGrant({ role: 'manager', moduleGrants: [] }, 'administracao'), /não concedido/i);
+  assert.doesNotThrow(() => requireModuleGrant({ role: 'manager', moduleGrants: ['administracao'] }, 'administracao'));
+  assert.doesNotThrow(() => requireModuleGrant({ role: 'admin', moduleGrants: [] }, 'administracao'));
+  assert.doesNotThrow(() => requireModuleGrant({ role: 'super_admin', moduleGrants: null }, 'administracao'));
+  assert.throws(() => requireModuleGrant({ role: 'member', moduleGrants: [] }, 'relatorios'), /não concedido/i);
 });
