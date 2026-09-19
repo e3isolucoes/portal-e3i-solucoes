@@ -78,6 +78,7 @@ function navIcon(name) {
 }
 
 export function renderSidebarNavigation() {
+  const valCount = validationBadgeCount();
   const mineCount = STATE.obligations.filter((o) => o.responsible_id === STATE.session?.id).length;
   const item = (view, label, icon, badge = '') => '<button type="button" class="side-nav-item ' + (STATE.view === view ? 'active' : '') + '" data-action="tab" data-tab="' + view + '"' + (STATE.view === view ? ' aria-current="page"' : '') + '>'
     + '<span class="side-nav-icon">' + navIcon(icon) + '</span>'
