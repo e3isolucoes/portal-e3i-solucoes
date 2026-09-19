@@ -43,6 +43,13 @@ export function isAdmin() {
   return ['super_admin', 'admin'].includes(STATE.profile?.role) && STATE.profile?.active !== false;
 }
 
+export function hasAdministrationAccess(profile = STATE.profile) {
+  if (!profile || profile.active === false) return false;
+  if (['super_admin', 'admin'].includes(String(profile.role || '').toLowerCase())) return true;
+  const grants = Array.isArray(profile.module_grants) ? profile.module_grants : [];
+  return grants.includes('administracao');
+}
+
 export function isSuperUser() {
   return STATE.profile?.role === 'super_admin' && STATE.profile?.active !== false;
 }
@@ -71,8 +78,8 @@ export function canWriteObligations() {
 }
 
 export function canAccessModule(moduleKey) {
-  if (isAdmin() || STATE.profile?.module_access == null) return true;
-  return Array.isArray(STATE.profile.module_access) && STATE.profile.module_access.includes(moduleKey);
+  if (isAdmin()) return true;
+  return Array.isArray(STATE.profile?.module_access) && STATE.profile.module_access.includes(moduleKey);
 }
 
 // A competência é o período de movimento/apuração e não o vencimento.
