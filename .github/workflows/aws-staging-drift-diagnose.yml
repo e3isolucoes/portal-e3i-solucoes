@@ -1,0 +1,45 @@
+name: AWS Staging Drift Diagnose
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/aws-staging-drift-diagnose.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: aws-staging
+    steps:
+      - uses: actions/checkout@v7
+      - name: Authenticate to AWS with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
+          role-session-name: github-painel-drift-diagnose
+          aws-region: sa-east-1
+          allowed-account-ids: '181215701228'
+          unset-current-credentials: true
+      - name: Inspect immutable Cognito schema and stack drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          STACK="e3i-staging-painel-obrigacoes"
+          REGION="sa-east-1"
+          POOL_ID="$(aws cloudformation describe-stack-resource             --stack-name "$STACK"             --logical-resource-id UserPool             --region "$REGION"             --query 'StackResourceDetail.PhysicalResourceId'             --output text)"
+
+          echo "=== USER POOL ==="
+          echo "$POOL_ID"
+          echo "=== COGNITO SCHEMA ==="
+          aws cognito-idp describe-user-pool             --user-pool-id "$POOL_ID"             --region "$REGION"             --query 'UserPool.SchemaAttributes[].{Name:Name,Type:AttributeDataType,Mutable:Mutable,Required:Required,StringMin:StringAttributeConstraints.MinLength,StringMax:StringAttributeConstraints.MaxLength}'             --output json
+
+          echo "=== ENTITLEMENT / PRETOKEN RESOURCES ==="
+          aws cloudformation list-stack-resources             --stack-name "$STACK"             --region "$REGION"             --query "StackResourceSummaries[?contains(LogicalResourceId, 'Entitlement') || contains(LogicalResourceId, 'PreToken')].[LogicalResourceId,ResourceType,PhysicalResourceId]"             --output json
+
+          echo "=== ORIGINAL STACK TEMPLATE MARKERS ==="
+          aws cloudformation get-template             --stack-name "$STACK"             --region "$REGION"             --template-stage Original             --query 'TemplateBody'             --output text > /tmp/current-stack-template.yaml
+          grep -nE 'Entitlement|PreToken|Schema:|legacy_user_id|Name:' /tmp/current-stack-template.yaml || true
