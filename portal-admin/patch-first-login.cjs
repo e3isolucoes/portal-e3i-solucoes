@@ -15,6 +15,36 @@ function replaceOnce(source, needle, replacement, label) {
 
 let server = fs.readFileSync(SERVER, 'utf8');
 
+if (!server.includes('E3I_ANONYMOUS_SESSION_PROBE_V1')) {
+  const sessionRouteRegex = /app\.get\((["'])\/api\/auth\/session\1/;
+  const sessionRoute = server.match(sessionRouteRegex);
+  if (!sessionRoute) throw new Error('auth session route marker not found');
+
+  const sessionProbeMiddleware = [
+    '  // E3I_ANONYMOUS_SESSION_PROBE_V1',
+    '  app.use("/api/auth/session", (req, res, next) => {',
+    '    if (req.method !== "GET") return next();',
+    '    const originalStatus = res.status.bind(res);',
+    '    const originalJson = res.json.bind(res);',
+    '    let anonymousProbe = false;',
+    '    res.status = (code) => {',
+    '      anonymousProbe = Number(code) === 401;',
+    '      return originalStatus(anonymousProbe ? 200 : code);',
+    '    };',
+    '    res.json = (payload) => originalJson(anonymousProbe',
+    '      ? { authenticated: false, user: null, session: null }',
+    '      : payload);',
+    '    next();',
+    '  });',
+    '',
+  ].join('\n');
+
+  const sessionRoutePosition = server.indexOf(sessionRoute[0]);
+  server = server.slice(0, sessionRoutePosition)
+    + sessionProbeMiddleware
+    + server.slice(sessionRoutePosition);
+}
+
 if (!server.includes('E3I_FIRST_LOGIN_PATCH_V1')) {
   const loginMarker = 'app.post("/api/auth/login", async (req, res) => {';
   const helperBlock = fs.readFileSync(SERVER_SNIPPET, 'utf8');
@@ -89,6 +119,7 @@ const authBridgeScriptPosition = patchedIndex.indexOf(authBridgeTag);
 const firstLoginScriptPosition = patchedIndex.indexOf(firstLoginTag);
 const firstScriptPosition = patchedIndex.indexOf('<script');
 const secondScriptPosition = patchedIndex.indexOf('<script', firstScriptPosition + 1);
+if (!patchedServer.includes('E3I_ANONYMOUS_SESSION_PROBE_V1')) throw new Error('anonymous session probe validation failed');
 if (!patchedServer.includes('E3I_FIRST_LOGIN_PATCH_V1')) throw new Error('server onboarding helper validation failed');
 if (!patchedServer.includes('PASSWORD_CHANGE_REQUIRED')) throw new Error('server onboarding guard validation failed');
 if (!patchedServer.includes('res.status(428)')) throw new Error('first-login status validation failed');

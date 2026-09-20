@@ -46,6 +46,7 @@ RUN node /tmp/patch-first-login.cjs \
  && grep -Fq 'admin-central.js' /app/private/admin-central.html \
  && grep -Fq 'E3I_ADMIN_CENTRAL_PATCH_V1' /app/dist/server.cjs \
  && grep -Fq 'E3I_ADMIN_USERS_PATCH_V1' /app/dist/server.cjs \
+ && grep -Fq 'E3I_ANONYMOUS_SESSION_PROBE_V1' /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/users' /app/dist/server.cjs \
  && grep -Fq '/api/admin/organizations/:organizationId/central-settings' /app/dist/server.cjs \
  && grep -Fq "app.get('/api/admin/access'" /app/dist/server.cjs \
