@@ -5,6 +5,8 @@ const assert = require('assert');
 const root = process.env.E3I_FIRST_LOGIN_DIR || __dirname;
 const firstLogin = fs.readFileSync(path.join(root, 'first-login.js'), 'utf8');
 const firstLoginCss = fs.readFileSync(path.join(root, 'first-login.css'), 'utf8');
+const serverPath = path.join(root, 'server.cjs');
+const server = fs.existsSync(serverPath) ? fs.readFileSync(serverPath, 'utf8') : '';
 
 assert.match(firstLogin, /data-e3i-cancel/, 'primeiro acesso deve oferecer botão Cancelar');
 assert.match(firstLogin, /function closeFirstLogin\(/, 'cancelamento deve usar uma rotina única de fechamento');
@@ -17,6 +19,13 @@ assert.match(firstLogin, /returnFocus = document\.activeElement/, 'modal deve le
 assert.match(firstLogin, /target\.focus\(\)/, 'cancelamento deve restaurar o foco anterior');
 assert.match(firstLoginCss, /\.e3i-secondary-button/, 'Cancelar deve usar ação secundária consistente');
 assert.match(firstLoginCss, /\.e3i-first-login-primary-actions/, 'ações principal e secundária devem permanecer agrupadas');
+
+if (server) {
+  assert.match(server, /E3I_ANONYMOUS_SESSION_PROBE_V1/, 'probe de sessão anônima deve estar instalado no servidor');
+  assert.match(server, /app\.use\("\/api\/auth\/session"/, 'normalização deve atingir somente a rota de sessão');
+  assert.match(server, /Number\(code\) === 401/, 'somente 401 do probe deve ser normalizado');
+  assert.match(server, /authenticated: false, user: null, session: null/, 'probe anônimo deve responder contrato explícito sem usuário');
+}
 
 const closeStart = firstLogin.indexOf('function closeFirstLogin');
 const closeEnd = firstLogin.indexOf('function ensureModal', closeStart);
