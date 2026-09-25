@@ -59,8 +59,18 @@ export async function handler(event) {
     }
     if (method === 'POST' && path === 'portal-session/exchange') {
       const session = await consumePortalSession(ddb, process.env.TABLE_NAME, parseBody(event).code);
-      const cookieToken = await issueBrowserSession(ddb, process.env.TABLE_NAME, session.refresh_token);
-      return response(200, { access_token: session.access_token, cognito_access_token: session.cognito_access_token }, event, { 'set-cookie': refreshCookie(cookieToken) });
+      const cookieToken = await issueBrowserSession(
+        ddb,
+        process.env.TABLE_NAME,
+        session.refresh_token,
+        Date.now(),
+        { workspaceId: session.workspaceId, userId: session.userId },
+      );
+      return response(200, {
+        access_token: session.access_token,
+        cognito_access_token: session.cognito_access_token,
+        workspaceId: session.workspaceId,
+      }, event, { 'set-cookie': refreshCookie(cookieToken) });
     }
     if (method === 'POST' && path === 'session/login') {
       const input = parseBody(event);
@@ -74,7 +84,11 @@ export async function handler(event) {
       // preserve 401 para cookies enviados, porém inválidos, expirados ou reutilizados.
       if (!refreshToken) return response(204, {}, event);
       const rotated = await rotateBrowserSession(cognito, ddb, process.env.TABLE_NAME, { userPoolId: process.env.USER_POOL_ID, clientId: process.env.USER_POOL_CLIENT_ID }, refreshToken);
-      return response(200, { access_token: rotated.access_token, cognito_access_token: rotated.cognito_access_token }, event, { 'set-cookie': refreshCookie(rotated.cookieToken) });
+      return response(200, {
+        access_token: rotated.access_token,
+        cognito_access_token: rotated.cognito_access_token,
+        workspaceId: rotated.workspaceId,
+      }, event, { 'set-cookie': refreshCookie(rotated.cookieToken) });
     }
     if (method === 'DELETE' && path === 'session') {
       await revokeBrowserSession(cognito, ddb, process.env.TABLE_NAME, process.env.USER_POOL_CLIENT_ID, readRefreshCookie(event.headers));
