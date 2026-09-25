@@ -16,7 +16,13 @@ function cognitoSession(tokens) {
   const apiToken = tokens?.AccessToken || tokens?.cognito_access_token;
   if (!idToken || !apiToken) return null;
   const claims = decodeJwt(idToken);
-  return { access_token: idToken, cognito_access_token: apiToken, expires_at: claims.exp, user: { id: claims['custom:legacy_user_id'] || claims['cognito:username'] || claims.sub, email: claims.email } };
+  return {
+    access_token: idToken,
+    cognito_access_token: apiToken,
+    expires_at: claims.exp,
+    workspace_id: tokens?.workspaceId || tokens?.workspace_id || null,
+    user: { id: claims['custom:legacy_user_id'] || claims['cognito:username'] || claims.sub, email: claims.email },
+  };
 }
 function portalCognitoSession(tokens) {
   const idToken = tokens?.access_token;
@@ -29,6 +35,7 @@ function portalCognitoSession(tokens) {
     access_token: idToken,
     cognito_access_token: tokens.cognito_access_token || null,
     expires_at: claims.exp,
+    workspace_id: tokens?.workspaceId || tokens?.workspace_id || null,
     user: {
       id: claims['custom:legacy_user_id'] || claims['cognito:username'] || claims.sub,
       email: claims.email,
@@ -199,3 +206,4 @@ export async function updateOwnPassword(password, code) {
   await cognitoCall('ConfirmForgotPassword', { ClientId: config().cognitoClientId, Username: recoveryEmail, ConfirmationCode: code, Password: password });
 }
 export async function getAccessToken() { return (await getSession()).data.session?.access_token || null; }
+export async function getActiveWorkspaceId() { return (await getSession()).data.session?.workspace_id || null; }
