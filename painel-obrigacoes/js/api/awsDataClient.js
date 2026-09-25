@@ -1,4 +1,4 @@
-import { getAccessToken } from './auth.js';
+import { getAccessToken, getActiveWorkspaceId } from './auth.js';
 import { STATE } from '../state.js';
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -33,6 +33,7 @@ export async function awsRequest(path, { method = 'GET', body } = {}) {
   if (!API_BASE) throw new Error('Backend AWS ainda não foi configurado.');
   const accessToken = await getAccessToken();
   if (!accessToken) throw new Error('Sua sessão expirou. Entre novamente.');
+  const workspaceId = STATE.profile?.workspace_id || await getActiveWorkspaceId();
   let response;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await waitForApiSlot();
@@ -41,7 +42,7 @@ export async function awsRequest(path, { method = 'GET', body } = {}) {
       headers: {
         authorization: `Bearer ${accessToken}`,
         'content-type': 'application/json',
-        ...(STATE.profile?.workspace_id ? { 'x-workspace-id': STATE.profile.workspace_id } : {})
+        ...(workspaceId ? { 'x-workspace-id': workspaceId } : {})
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: 'omit',
